@@ -44,6 +44,8 @@ public class GetOrdersHandler : ISyncTaskHandler
 
         // SalesOrderDetail.ProductID FK points to SpecialOfferProduct, not directly to Product.
         // Must join through SpecialOfferProduct to correctly resolve the product.
+        // Using the same @ModifiedSince filter via a JOIN to SalesOrderHeader avoids
+        // passing thousands of order IDs as parameters (SQL Server limit: 2100).
         const string detailsSql = """
             SELECT
                 sod.SalesOrderID,
@@ -53,11 +55,13 @@ public class GetOrdersHandler : ISyncTaskHandler
                 sod.OrderQty     AS Quantity,
                 sod.LineTotal
             FROM Sales.SalesOrderDetail sod
+            INNER JOIN Sales.SalesOrderHeader soh
+                ON sod.SalesOrderID = soh.SalesOrderID
             INNER JOIN Sales.SpecialOfferProduct sop
                 ON sod.ProductID = sop.ProductID AND sod.SpecialOfferID = sop.SpecialOfferID
             INNER JOIN Production.Product pr
                 ON sop.ProductID = pr.ProductID
-            WHERE sod.SalesOrderID IN @OrderIds
+            WHERE (@ModifiedSince IS NULL OR soh.ModifiedDate >= @ModifiedSince)
             """;
 
         await using var connection = new SqlConnection(_connectionString);
@@ -70,11 +74,9 @@ public class GetOrdersHandler : ISyncTaskHandler
         if (headers.Count == 0)
             return [];
 
-        var orderIds = headers.Select(h => h.SalesOrderId).ToList();
-
         var details = await connection.QueryAsync<OrderDetailRow>(
             detailsSql,
-            new { OrderIds = orderIds },
+            new { parameters.ModifiedSince },
             commandTimeout: 60);
 
         // Group details by order and attach them
