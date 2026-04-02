@@ -110,7 +110,17 @@ Build your solution in the `candidate/` directory. See **[CHALLENGE_DESCRIPTION.
 
 ---
 
-## Submission
+## How to Submit Your Solution
 
-1. Create meaningful commits that explain your reasoning
-2. Fill in **[CHALLENGE_SUBMISSION.md](CHALLENGE_SUBMISSION.md)** before submitting
+1. **Fork** this repository to your own GitHub account
+2. Push your changes to your fork
+3. Open a **Pull Request** back to this repository
+
+> **Do not try to push directly to this repo** — you won't have write access and it will fail.
+
+Make sure to:
+- Create meaningful commits that explain your reasoning
+- Fill in **[CHALLENGE_SUBMISSION.md](CHALLENGE_SUBMISSION.md)** before submitting
+
+If you're unsure how to open a PR from a fork, refer to this GitHub guide:
+https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork
