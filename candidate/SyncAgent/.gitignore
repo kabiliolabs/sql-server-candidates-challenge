@@ -1,0 +1,12 @@
+# Build output
+bin/
+obj/
+
+# User-specific settings
+*.user
+*.suo
+.vs/
+
+# Secrets — never commit real credentials
+appsettings.Production.json
+**/appsettings.*.local.json
