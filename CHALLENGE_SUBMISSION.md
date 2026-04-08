@@ -2,26 +2,29 @@
 
 ## Candidate
 
-- **Name:**
-- **Date:**
+- **Aitor:**
+- **08/04/2026:**
 
 ---
 
 ## How to Run
 
-<!-- Provide step-by-step instructions to build and run your solution -->
+console app client :
+- run the sync platform form from the exe file (double-click)
+- run the console app
+- add tasks to the queue
 
 ---
 
 ## Architecture Decisions
 
-<!-- Explain your project structure and key design decisions. Why did you choose this approach? -->
+little of DDD, I tried, services, repository pattern, interfaces and basic unit test.
 
 ---
 
 ## Security Measures
 
-<!-- What security measures did you implement and why? -->
+any, i didn't use jwt and neither api authorization methods....
 
 ---
 
@@ -33,26 +36,22 @@
 
 ## Known Limitations
 
-<!-- Be honest about trade-offs you made due to time constraints. What would you improve? -->
+I would ad more unit testing for covering all casuristics, and i would implement also a integration test for all layers testing.
 
 ---
 
 ## AI Tools Used
 
-<!-- Which AI tools did you use? How did you use them? Be specific.
-     Examples:
-     - "Used GitHub Copilot for autocomplete while writing query classes"
-     - "Used ChatGPT to research AdventureWorks schema relationships"
-     - "Used Claude to generate unit test boilerplate" -->
+I used ChatGPT in order to generate the models (Product, Order, etc...)
 
 ---
 
 ## Time Spent
 
-<!-- Approximate breakdown of how you spent your time -->
+4 days
 
 ---
 
 ## Feedback
 
-<!-- Any feedback on the challenge itself? Was anything unclear? What would you change? -->
+any

@@ -27,7 +27,7 @@ public class TaskQueueService
             TaskType = "GetCustomers",
             Parameters = new Dictionary<string, string>
             {
-                ["modifiedSince"] = "2025-01-01T00:00:00Z"
+                ["modifiedSince"] = "2002-01-01T00:00:00Z"
             },
             CreatedAt = DateTime.UtcNow
         };
@@ -41,7 +41,7 @@ public class TaskQueueService
             TaskType = "GetProducts",
             Parameters = new Dictionary<string, string>
             {
-                ["modifiedSince"] = "2025-01-01T00:00:00Z"
+                ["modifiedSince"] = "2002-01-01T00:00:00Z"
             },
             CreatedAt = DateTime.UtcNow
         };
@@ -55,7 +55,7 @@ public class TaskQueueService
             TaskType = "GetOrders",
             Parameters = new Dictionary<string, string>
             {
-                ["modifiedSince"] = "2025-01-01T00:00:00Z"
+                ["modifiedSince"] = "2002-01-01T00:00:00Z"
             },
             CreatedAt = DateTime.UtcNow
         };
@@ -69,7 +69,7 @@ public class TaskQueueService
             TaskType = "GetProductInventory",
             Parameters = new Dictionary<string, string>
             {
-                ["modifiedSince"] = "2025-01-01T00:00:00Z"
+                ["modifiedSince"] = "2002-01-01T00:00:00Z"
             },
             CreatedAt = DateTime.UtcNow
         };
