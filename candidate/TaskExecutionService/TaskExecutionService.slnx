@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TaskExecutionService.csproj" />
+  <Project Path="../TaskExecutionService.Tests/TaskExecutionService.Tests.csproj" />
+</Solution>
