@@ -46,6 +46,14 @@ public sealed class Worker : BackgroundService
                     continue;
                 }
 
+                if (string.IsNullOrWhiteSpace(task.TaskId))
+                {
+                    // Without an id the platform cannot match a result, so a POST would just be
+                    // rejected — skip it rather than do pointless work.
+                    _logger.LogWarning("Received a task without a taskId; skipping it.");
+                    continue;
+                }
+
                 _logger.LogInformation("Picked up task {TaskType} ({TaskId}).", task.TaskType, task.TaskId);
 
                 var result = await _dispatcher.DispatchAsync(task, stoppingToken);

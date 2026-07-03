@@ -41,13 +41,17 @@ public sealed class PlatformClient : IPlatformClient
         using var content = JsonContent.Create(result, options: SyncJson.Options);
         using var response = await _http.PostAsync(ResultPath, content, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogError(
-                "Platform rejected result for task {TaskId} ({TaskType}): {StatusCode} {Body}",
-                result.TaskId, result.TaskType, (int)response.StatusCode, body);
-            response.EnsureSuccessStatusCode();
+            return;
         }
+
+        // Surface the platform's rejection reason locally, then fail so the worker can back off.
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        _logger.LogError(
+            "Platform rejected result for task {TaskId} ({TaskType}): {StatusCode} {Body}",
+            result.TaskId, result.TaskType, (int)response.StatusCode, body);
+        throw new HttpRequestException(
+            $"Platform returned {(int)response.StatusCode} when posting result for task {result.TaskId}.");
     }
 }
