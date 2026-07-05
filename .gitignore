@@ -15,6 +15,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+[Tt]est[Rr]esults/
 
 ## NuGet
 *.nupkg
