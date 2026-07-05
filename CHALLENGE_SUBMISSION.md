@@ -48,6 +48,8 @@ database restored (see the root `README.md`).
 cd candidate/TaskExecutionService.Tests
 dotnet test                 # unit tests only (DB-backed tests are skipped)
 SYNC_DB_TESTS=1 dotnet test  # also runs integration + end-to-end tests (needs the DB)
+# or 
+set "SYNC_DB_TESTS=1" && dotnet test # if you are using a cmd in windows
 ```
 
 ---
