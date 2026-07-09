@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- Makes the coverage collector apply to a bare `dotnet test`, with no collect flag. -->
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)..\..\coverlet.runsettings</RunSettingsFilePath>
+
+    <!--
+      Integration tests need a live AdventureWorks2025, so they are out of the default run.
+      A bare `dotnet test` runs the unit tests; passing a filter of `Category=Integration` runs
+      the integration tests instead.
+
+      The `dotnet test` filter option supplies VSTestTestCaseFilter as a global property, which
+      replaces this default outright. The same filter placed in coverlet.runsettings would instead
+      be ANDed with the command line, and asking for Category=Integration would then resolve to
+      an impossible filter that silently matches no tests.
+    -->
+    <VSTestTestCaseFilter Condition="'$(VSTestTestCaseFilter)' == ''">Category!=Integration</VSTestTestCaseFilter>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <!-- 8.10.0 to stay on the same Microsoft.Extensions.* wave as Http.Resilience in the agent. -->
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="8.10.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NSubstitute" Version="5.1.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SyncAgent\SyncAgent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The documented payloads are the contract. ContractShapeTests diffs the DTOs against them. -->
+    <None Include="$(MSBuildThisFileDirectory)..\..\..\docs\sample-payloads\result-*.json"
+          Link="SamplePayloads\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+
+    <None Include="appsettings.Integration.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

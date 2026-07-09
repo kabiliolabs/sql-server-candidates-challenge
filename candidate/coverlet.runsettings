@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+
+  <!--
+    Referenced from SyncAgent.Tests.csproj via RunSettingsFilePath, so a bare `dotnet test`
+    collects coverage without anyone having to remember to ask for it.
+
+    The "exclude integration tests by default" filter deliberately lives in the .csproj as
+    VSTestTestCaseFilter and not here. A TestCaseFilter in a runsettings file is ANDed with the
+    command line, not replaced by it, so asking for Category=Integration would resolve to an
+    impossible conjunction with Category!=Integration and silently match no tests at all.
+  -->
+
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[SyncAgent]*</Include>
+
+          <!--
+            Excluded because they carry no branch a unit test could meaningfully exercise:
+              Program.cs             DI wiring; proven by running the agent, not by a mock.
+              Data/Queries/*.cs      const SQL strings.
+              Data/SqlQueryExecutor  the Dapper/ADO.NET seam itself; covered by the integration tests.
+              Dto/*.cs               property bags.
+          -->
+          <ExcludeByFile>**/Program.cs,**/Data/Queries/*.cs,**/Data/SqlQueryExecutor.cs,**/Dto/*.cs</ExcludeByFile>
+          <!--
+            Deliberately does not list CompilerGeneratedAttribute: it is stamped on the state
+            machines the compiler emits for `async` methods and iterators, so excluding it hides
+            the body of nearly every method here behind a 100% that means nothing.
+          -->
+          <ExcludeByAttribute>GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+
+</RunSettings>
