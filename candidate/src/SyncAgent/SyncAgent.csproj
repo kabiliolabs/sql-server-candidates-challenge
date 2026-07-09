@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <UserSecretsId>dotnet-SyncAgent-f8519cbf-9963-4c4b-8ef5-60af482eccbe</UserSecretsId>
+    <RootNamespace>SyncAgent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Versions pinned deliberately: an unpinned restore resolves 10.x packages that target net10.0. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.10.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SyncAgent.Tests" />
+  </ItemGroup>
+
+</Project>
