@@ -252,19 +252,20 @@ looked correct in a manual eyeball of the sample payloads.
 
 ## Time Spent
 
-Roughly 3 hours, against a 2-hour expectation.
+About 2 hours, in line with the estimate.
 
 | Phase | Time |
 |---|---|
-| Reading the brief, exploring the schema, verifying the data facts | 45 min |
-| Planning: query design, layout, deciding the security measures | 20 min |
-| Implementation (5 commits, code + tests together) | 75 min |
-| End-to-end verification, write-up | 40 min |
+| Installing SQL Server Express and SSMS, restoring `AdventureWorks2025` | 20 min |
+| Reading the brief, exploring the schema, verifying the data facts | 20 min |
+| Implementation (6 commits, code + tests together) | ~60 min |
+| End-to-end verification, write-up | 20 min |
 
-The overrun is entirely in the first two rows. Writing the four queries takes twenty minutes; being
-sure they are *correct* — that the address join does not duplicate customers, that the category join
-does not drop 209 products — took considerably longer, and is the part that would have caused a
-production incident had I skipped it.
+A sixth of the budget went on environment setup before a line of code was written, which the
+2-hour estimate does not appear to account for. Of the rest, writing the four queries was quick;
+being sure they are *correct* — that the address join does not duplicate customers, that the
+category join does not drop 209 products — is where the time went, and is the part that would have
+caused a production incident had I skipped it.
 
 ---
 
@@ -284,10 +285,10 @@ observations:
    intentional — a test of whether the candidate notices and documents it — it works well. If not,
    adding `companyName` would remove the guesswork.
 
-3. **The 2-hour estimate is optimistic** if the schema archaeology is done properly, which the brief
-   explicitly asks for. Two hours is about right for the agent, the API contract and the tests; it is
-   not enough to *also* discover the four join traps. Either signposting the traps or raising the
-   estimate would set expectations better.
+3. **The 2-hour estimate does not seem to budget for environment setup.** Installing SQL Server
+   Express and SSMS and restoring `AdventureWorks2025` took 20 minutes — a sixth of the budget —
+   before any code was written. Worth either calling out in the prerequisites, or excluding from
+   the estimate explicitly.
 
 Minor: `docs/api-contract.md` documents `parameters` as an object, and the platform models it as
 `Dictionary<string, string>`. Worth stating that all values are strings — it changes how the
