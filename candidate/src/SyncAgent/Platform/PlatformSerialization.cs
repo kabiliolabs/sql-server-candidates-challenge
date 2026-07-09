@@ -18,5 +18,8 @@ namespace SyncAgent.Platform;
 /// </remarks>
 internal static class PlatformSerialization
 {
-    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new UtcDateTimeJsonConverter() },
+    };
 }

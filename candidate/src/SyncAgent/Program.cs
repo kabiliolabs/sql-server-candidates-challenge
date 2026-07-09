@@ -2,8 +2,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SyncAgent;
 using SyncAgent.Configuration;
+using SyncAgent.Data;
 using SyncAgent.Platform;
 using SyncAgent.Sync;
+using SyncAgent.Sync.Handlers;
 using SyncAgent.Validation;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -17,6 +19,11 @@ builder.Services.AddOptions<AgentOptions>()
 
 builder.Services.AddOptions<PlatformOptions>()
     .Bind(builder.Configuration.GetSection(PlatformOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddOptions<DatabaseOptions>()
+    .Bind(builder.Configuration.GetSection(DatabaseOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
@@ -38,10 +45,15 @@ builder.Services.AddHttpClient<IPlatformClient, PlatformClient>()
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddSingleton<ITaskValidator, TaskValidator>();
+builder.Services.AddSingleton<ISqlQueryExecutor, SqlQueryExecutor>();
 builder.Services.AddSingleton<ISyncTaskDispatcher, SyncTaskDispatcher>();
 
-// Adding a fifth task type means one class implementing ISyncTaskHandler and one registration
-// line here. The dispatcher builds its routing table from whatever is registered.
+// Adding a fifth task type means one class implementing ISyncTaskHandler and one line here.
+// The dispatcher builds its routing table from whatever is registered, so nothing else changes.
+builder.Services.AddSingleton<ISyncTaskHandler, GetCustomersHandler>();
+builder.Services.AddSingleton<ISyncTaskHandler, GetProductsHandler>();
+builder.Services.AddSingleton<ISyncTaskHandler, GetOrdersHandler>();
+builder.Services.AddSingleton<ISyncTaskHandler, GetProductInventoryHandler>();
 
 builder.Services.AddHostedService<Worker>();
 
