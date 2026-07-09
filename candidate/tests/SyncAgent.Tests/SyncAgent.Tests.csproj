@@ -8,8 +8,20 @@
     <IsTestProject>true</IsTestProject>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
-    <!-- Makes the coverage collector and the Category!=Integration filter apply to a bare `dotnet test`. -->
+    <!-- Makes the coverage collector apply to a bare `dotnet test`, with no collect flag. -->
     <RunSettingsFilePath>$(MSBuildThisFileDirectory)..\..\coverlet.runsettings</RunSettingsFilePath>
+
+    <!--
+      Integration tests need a live AdventureWorks2025, so they are out of the default run.
+      A bare `dotnet test` runs the unit tests; passing a filter of `Category=Integration` runs
+      the integration tests instead.
+
+      The `dotnet test` filter option supplies VSTestTestCaseFilter as a global property, which
+      replaces this default outright. The same filter placed in coverlet.runsettings would instead
+      be ANDed with the command line, and asking for Category=Integration would then resolve to
+      an impossible filter that silently matches no tests.
+    -->
+    <VSTestTestCaseFilter Condition="'$(VSTestTestCaseFilter)' == ''">Category!=Integration</VSTestTestCaseFilter>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,6 +48,8 @@
     <None Include="$(MSBuildThisFileDirectory)..\..\..\docs\sample-payloads\result-*.json"
           Link="SamplePayloads\%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+
+    <None Include="appsettings.Integration.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

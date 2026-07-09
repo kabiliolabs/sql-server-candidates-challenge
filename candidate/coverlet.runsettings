@@ -3,15 +3,13 @@
 
   <!--
     Referenced from SyncAgent.Tests.csproj via RunSettingsFilePath, so a bare `dotnet test`
-    picks it up. Two consequences, both deliberate:
-      * coverage is collected on every run, not only when someone remembers to ask for it;
-      * integration tests are excluded by default, and opted into by overriding
-        the filter on the command line with `Category=Integration`.
-  -->
+    collects coverage without anyone having to remember to ask for it.
 
-  <RunConfiguration>
-    <TestCaseFilter>Category!=Integration</TestCaseFilter>
-  </RunConfiguration>
+    The "exclude integration tests by default" filter deliberately lives in the .csproj as
+    VSTestTestCaseFilter and not here. A TestCaseFilter in a runsettings file is ANDed with the
+    command line, not replaced by it, so asking for Category=Integration would resolve to an
+    impossible conjunction with Category!=Integration and silently match no tests at all.
+  -->
 
   <DataCollectionRunSettings>
     <DataCollectors>
