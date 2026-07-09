@@ -66,7 +66,7 @@ line in the imperative, `type(scope): summary`.
 
 End every commit message with:
 
-```
+```text
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 ```
 
@@ -88,5 +88,5 @@ Package versions are pinned in the `.csproj` files. An unpinned
 `dotnet add package` resolves 10.x packages targeting `net10.0` and breaks the
 build. Do not "upgrade" them.
 
-`candidate/PLAN.md` holds the verified database facts and query designs. Read it
-first. Fold it into `CHALLENGE_SUBMISSION.md` and delete it before the final commit.
+The verified database facts, the query designs and the reasoning behind them now
+live in `CHALLENGE_SUBMISSION.md`. Read it before changing a query.
