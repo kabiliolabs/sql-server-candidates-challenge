@@ -1,7 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using SyncAgent;
 using SyncAgent.Configuration;
 using SyncAgent.Platform;
+using SyncAgent.Sync;
+using SyncAgent.Validation;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -29,6 +32,18 @@ builder.Services.AddHttpClient<IPlatformClient, PlatformClient>()
         // Polly requires the breaker's sampling window to be at least twice the attempt timeout.
         options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
     });
+
+// Injected rather than called statically, so the polling loop can be tested against a fake clock
+// instead of sleeping in real time. Nothing in the agent calls DateTime.UtcNow.
+builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services.AddSingleton<ITaskValidator, TaskValidator>();
+builder.Services.AddSingleton<ISyncTaskDispatcher, SyncTaskDispatcher>();
+
+// Adding a fifth task type means one class implementing ISyncTaskHandler and one registration
+// line here. The dispatcher builds its routing table from whatever is registered.
+
+builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();
 host.Run();
