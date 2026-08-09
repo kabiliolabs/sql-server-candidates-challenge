@@ -116,6 +116,12 @@ public sealed class Worker : BackgroundService
         await _platformClient.SubmitResultAsync(
             result,
             cancellationToken);
+        _logger.LogInformation(
+            "Task {TaskId} ({TaskType}) finished with status {Status}. Records: {RecordCount}",
+            result.TaskId,
+            result.TaskType,
+            result.Status,
+            result.RecordCount);
     }
 
     private static void ValidateTask(SyncTask task)

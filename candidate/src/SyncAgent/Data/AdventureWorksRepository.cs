@@ -239,9 +239,24 @@ public sealed class AdventureWorksRepository : IAdventureWorksRepository
                 sod.OrderQty AS Quantity,
                 sod.LineTotal
             FROM Sales.SalesOrderDetail AS sod
+
+            INNER JOIN Sales.SalesOrderHeader AS soh
+                ON soh.SalesOrderID = sod.SalesOrderID
+
             INNER JOIN Production.Product AS product
                 ON product.ProductID = sod.ProductID
-            WHERE sod.SalesOrderID IN @OrderIds
+
+            WHERE
+                soh.ModifiedDate >= @ModifiedSince
+
+                OR EXISTS
+                (
+                    SELECT 1
+                    FROM Sales.SalesOrderDetail AS changedDetail
+                    WHERE changedDetail.SalesOrderID = soh.SalesOrderID
+                      AND changedDetail.ModifiedDate >= @ModifiedSince
+                )
+
             ORDER BY
                 sod.SalesOrderID,
                 sod.SalesOrderDetailID;
@@ -251,7 +266,7 @@ public sealed class AdventureWorksRepository : IAdventureWorksRepository
 			detailsSql,
 			new
 			{
-				OrderIds = orders.Select(x => x.SalesOrderId).ToArray()
+				ModifiedSince = modifiedSince
 			},
 			cancellationToken: cancellationToken,
 			commandTimeout: 30);
