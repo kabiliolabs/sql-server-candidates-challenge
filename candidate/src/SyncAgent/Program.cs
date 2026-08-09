@@ -3,6 +3,8 @@ using SyncAgent;
 using SyncAgent.Api;
 using SyncAgent.Configuration;
 using SyncAgent.Services;
+using SyncAgent.Data;
+using SyncAgent.Handlers;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -45,6 +47,26 @@ builder.Services.AddHttpClient<
 builder.Services.AddSingleton<
     ISyncTaskDispatcher,
     SyncTaskDispatcher>();
+
+builder.Services.AddSingleton<
+    IAdventureWorksRepository,
+    AdventureWorksRepository>();
+
+builder.Services.AddSingleton<
+    ISyncTaskHandler,
+    GetCustomersHandler>();
+
+builder.Services.AddSingleton<
+    ISyncTaskHandler,
+    GetProductsHandler>();
+
+builder.Services.AddSingleton<
+    ISyncTaskHandler,
+    GetOrdersHandler>();
+
+builder.Services.AddSingleton<
+    ISyncTaskHandler,
+    GetProductInventoryHandler>();
 
 builder.Services.AddHostedService<Worker>();
 
