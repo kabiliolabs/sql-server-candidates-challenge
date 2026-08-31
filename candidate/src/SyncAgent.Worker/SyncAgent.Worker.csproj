@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <!-- Matches the ".NET 8 SDK or later" prerequisite in the repo README, rather than
+         the newer TFM the local SDK defaults to - keeps the build reproducible on
+         whatever SDK version the evaluator actually has installed. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-SyncAgent.Worker-fed70a2d-b8eb-4259-890c-3af1c1c5d937</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.79" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <!-- Pinned to 8.0.1 to match Microsoft.Extensions.Hosting above - the latest
+         WindowsServices package (10.x) requires Hosting >= 10.0.11 and fails restore
+         with an NU1605 downgrade error against the net8.0-aligned Hosting version. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+  </ItemGroup>
+</Project>
