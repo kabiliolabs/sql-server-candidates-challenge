@@ -216,6 +216,54 @@ namespace SyncAgent.Core.Tests
         }
 
         [Fact]
+        public async Task A_task_interrupted_by_shutdown_is_still_reported()
+        {
+            // The single most important shutdown behaviour, and the reason SubmitResultAsync
+            // switches to a fresh token bounded by the grace period. The platform's dequeue is
+            // destructive, so a task the agent is holding when it is stopped would otherwise
+            // vanish with no record on either side. Submitting on the already-cancelled token
+            // would cancel the report as well.
+            var task = TestData.Task();
+            var options = TestData.Options();
+            var submitted = new List<SyncTaskResult>();
+
+            using (var cts = new CancellationTokenSource())
+            {
+                _platform.GetNextTaskAsync(Arg.Any<CancellationToken>())
+                    .Returns(Task.FromResult<SyncTaskRequest?>(task));
+
+                _dispatcher.DispatchAsync(task, Arg.Any<CancellationToken>()).Returns<SyncPayload>(_ =>
+                {
+                    cts.Cancel();
+                    throw new OperationCanceledException(cts.Token);
+                });
+
+                _platform
+                    .When(client => client.SubmitResultAsync(
+                        Arg.Any<SyncTaskResult>(),
+                        Arg.Any<CancellationToken>()))
+                    .Do(call => submitted.Add(call.Arg<SyncTaskResult>()));
+
+                var worker = new SyncAgentWorker(
+                    _platform,
+                    _dispatcher,
+                    new SyncTaskValidator(options, _clock),
+                    new PassThroughRetryExecutor(),
+                    _delays,
+                    _clock,
+                    options,
+                    NullLogger<SyncAgentWorker>.Instance);
+
+                await worker.RunAsync(cts.Token);
+            }
+
+            submitted.Should().ContainSingle();
+            submitted[0].Status.Should().Be(SyncTaskStatus.Failed);
+            submitted[0].TaskId.Should().Be(task.TaskId);
+            submitted[0].ErrorMessage.Should().Contain("shutting down");
+        }
+
+        [Fact]
         public async Task The_executed_at_stamp_comes_from_the_clock()
         {
             var task = TestData.Task();
