@@ -37,9 +37,12 @@ namespace SyncAgent.Infrastructure.Configuration
                 ? string.Empty
                 : secret.Substring(0, VisiblePrefixLength);
 
+            // Plain ASCII rather than an ellipsis character: log files get opened with
+            // whatever encoding the reader defaults to, and a mojibake byte in the middle of
+            // the one line that identifies the environment is a needless distraction.
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "{0}… ({1} chars)",
+                "{0}... ({1} chars)",
                 visible,
                 secret.Length);
         }
@@ -64,12 +67,15 @@ namespace SyncAgent.Infrastructure.Configuration
             {
                 var source = new SqlConnectionStringBuilder(connectionString);
 
+                // Server, database and identity only. Application name is left out on
+                // purpose: the redaction runs on the configured string, before the connection
+                // factory stamps its own, so copying it would print the driver's default and
+                // suggest the agent is not identifying itself when it is.
                 var safe = new SqlConnectionStringBuilder
                 {
                     DataSource = source.DataSource,
                     InitialCatalog = source.InitialCatalog,
                     IntegratedSecurity = source.IntegratedSecurity,
-                    ApplicationName = source.ApplicationName,
                 };
 
                 if (!source.IntegratedSecurity && !string.IsNullOrEmpty(source.UserID))
