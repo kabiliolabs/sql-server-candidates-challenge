@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The domain and orchestration layer. It deliberately references no database, HTTP or
+    configuration library: everything it needs from the outside world is expressed as an
+    interface in Abstractions/. That is what makes the polling loop and the dispatcher
+    unit-testable without a SQL Server or a network.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+</Project>

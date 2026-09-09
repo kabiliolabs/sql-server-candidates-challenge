@@ -1,0 +1,51 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      The role this agent is built for targets .NET Framework 4.8 desktop/service workloads,
+      so the whole solution pins a single TFM here rather than per project. That guarantees
+      every assembly is compiled against the same surface and that no project silently drifts
+      onto a runtime the client machines do not have.
+    -->
+    <TargetFramework>net48</TargetFramework>
+
+    <!--
+      C# 9 is the highest language version that is safe on .NET Framework 4.8: it needs only
+      the IsExternalInit shim (see src/SyncAgent.Core/Properties/IsExternalInit.cs) to enable
+      init-only properties and records. Anything above that starts requiring BCL types the
+      4.8 runtime does not ship.
+    -->
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+
+    <!-- Quality gate: nothing merges with a warning still in it. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+
+    <!--
+      Mandatory on .NET Framework. NuGet routinely resolves transitive dependencies to
+      assembly versions newer than the ones referenced at compile time; without generated
+      redirects the process throws FileLoadException at runtime instead of at build time.
+    -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+
+    <Deterministic>true</Deterministic>
+    <NeutralLanguage>en</NeutralLanguage>
+    <Product>Kabilio SQL Server Sync Agent</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Ships the .NET Framework 4.8 reference assemblies as a NuGet package so `dotnet build`
+      works on machines without Visual Studio or the 4.8 targeting pack installed (CI agents,
+      a reviewer with only the .NET SDK). Build-time only; nothing is copied to the output.
+    -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
