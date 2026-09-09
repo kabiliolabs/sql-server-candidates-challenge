@@ -48,4 +48,14 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      IsExternalInit is internal, so every assembly that uses an init-only property needs its
+      own copy. Linking one file here beats redeclaring it in each project and keeps the
+      explanation of why it exists in a single place.
+    -->
+    <Compile Include="$(MSBuildThisFileDirectory)build\IsExternalInit.cs"
+             Link="Properties\IsExternalInit.cs" />
+  </ItemGroup>
+
 </Project>
