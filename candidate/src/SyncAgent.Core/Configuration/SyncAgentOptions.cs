@@ -70,6 +70,18 @@ namespace SyncAgent.Core.Configuration
         public TimeSpan ClockSkewTolerance { get; set; } = TimeSpan.FromMinutes(5);
 
         /// <summary>
+        /// How long the agent may keep working after a stop has been requested, purely to
+        /// report the outcome of the task it already claimed.
+        /// </summary>
+        /// <remarks>
+        /// The platform's dequeue is destructive and has no redelivery, so a task the agent
+        /// holds when it is stopped would otherwise vanish with no record on either side.
+        /// Kept well inside the 30 seconds the Windows service control manager allows before
+        /// it declares a stop hung.
+        /// </remarks>
+        public TimeSpan ShutdownGracePeriod { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
         /// Validates the whole object and throws once, listing every problem found.
         /// </summary>
         /// <remarks>
@@ -142,6 +154,11 @@ namespace SyncAgent.Core.Configuration
             if (ClockSkewTolerance < TimeSpan.Zero)
             {
                 errors.Add("Clock skew tolerance cannot be negative.");
+            }
+
+            if (ShutdownGracePeriod <= TimeSpan.Zero)
+            {
+                errors.Add("Shutdown grace period must be greater than zero.");
             }
 
             if (errors.Count > 0)
