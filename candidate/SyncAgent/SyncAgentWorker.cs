@@ -12,14 +12,14 @@ namespace SyncAgent
     /// logged and the loop continues. Dedupe by taskId (forward-looking safety).</summary>
     public sealed class SyncAgentWorker
     {
-        private readonly SyncPlatformClient _platform;
+        private readonly ISyncPlatformClient _platform;
         private readonly SyncTaskDispatcher _dispatcher;
         private readonly AgentOptions _options;
         private readonly ILogger<SyncAgentWorker> _logger;
         private readonly HashSet<string> _seen = new HashSet<string>();
 
         public SyncAgentWorker(
-            SyncPlatformClient platform,
+            ISyncPlatformClient platform,
             SyncTaskDispatcher dispatcher,
             AgentOptions options,
             ILogger<SyncAgentWorker> logger)

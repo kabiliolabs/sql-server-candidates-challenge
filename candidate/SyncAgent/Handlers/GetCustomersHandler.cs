@@ -66,7 +66,7 @@ ORDER BY c.CustomerID";
             {
                 cmd.CommandText = Query;
                 cmd.CommandTimeout = _options.CommandTimeoutSeconds;
-                cmd.Parameters.Add(ModifiedSinceParameter(modifiedSince));
+                cmd.Parameters.Add(SqlParameterHelpers.ModifiedSince(modifiedSince));
                 cmd.Parameters.Add(new SqlParameter("@MaxRows", SqlDbType.Int) { Value = _options.MaxRows });
 
                 await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -107,14 +107,6 @@ ORDER BY c.CustomerID";
             _logger.LogInformation("GetCustomers: {Count} rows (modifiedSince={ModifiedSince}).",
                 rows.Count, modifiedSince.HasValue ? modifiedSince.Value.ToString("o") : "all");
             return SyncResult.Completed(task.taskId, task.taskType, rows, DateTime.UtcNow);
-        }
-
-        internal static SqlParameter ModifiedSinceParameter(DateTime? modifiedSince)
-        {
-            return new SqlParameter("@ModifiedSince", SqlDbType.DateTime2)
-            {
-                Value = (object)modifiedSince ?? DBNull.Value
-            };
         }
     }
 }

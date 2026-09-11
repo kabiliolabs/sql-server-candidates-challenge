@@ -77,7 +77,7 @@ namespace SyncAgent
                     });
             });
 
-            services.AddHttpClient<SyncPlatformClient>((provider, client) =>
+            services.AddHttpClient<ISyncPlatformClient, SyncPlatformClient>((provider, client) =>
             {
                 client.BaseAddress = new Uri(options.Url);
                 client.Timeout = TimeSpan.FromSeconds(10); // cap stop/shutdown time on hung calls

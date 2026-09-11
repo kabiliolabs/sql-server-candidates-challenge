@@ -12,7 +12,7 @@ namespace SyncAgent.Protocol
 {
     /// <summary>Typed client for the central platform. 204 means "no work", not an error;
     /// rejected results are logged so failures are observable.</summary>
-    public class SyncPlatformClient
+    public class SyncPlatformClient : ISyncPlatformClient
     {
         private readonly HttpClient _http;
         private readonly ILogger<SyncPlatformClient> _logger;
@@ -23,7 +23,7 @@ namespace SyncAgent.Protocol
             _logger = logger;
         }
 
-        public virtual async Task<SyncTask> GetNextTaskAsync(CancellationToken cancellationToken)
+        public async Task<SyncTask> GetNextTaskAsync(CancellationToken cancellationToken)
         {
             using (HttpResponseMessage response = await _http
                 .GetAsync("api/sync/next-task", cancellationToken).ConfigureAwait(false))
@@ -44,7 +44,7 @@ namespace SyncAgent.Protocol
             }
         }
 
-        public virtual async Task<bool> PostResultAsync(SyncResult result, CancellationToken cancellationToken)
+        public async Task<bool> PostResultAsync(SyncResult result, CancellationToken cancellationToken)
         {
             string json = JsonConvert.SerializeObject(result);
             using (var content = new StringContent(json, Encoding.UTF8, "application/json"))

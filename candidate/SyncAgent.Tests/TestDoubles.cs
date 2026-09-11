@@ -44,24 +44,19 @@ namespace SyncAgent.Tests
         }
     }
 
-    internal sealed class FakePlatformClient : SyncPlatformClient
+    internal sealed class FakePlatformClient : ISyncPlatformClient
     {
         public readonly Queue<SyncTask> Tasks = new Queue<SyncTask>();
         public bool ThrowOnGetNext;
 
-        public FakePlatformClient()
-            : base(new HttpClient(), NullLogger<SyncPlatformClient>.Instance)
-        {
-        }
-
-        public override Task<SyncTask> GetNextTaskAsync(CancellationToken cancellationToken)
+        public Task<SyncTask> GetNextTaskAsync(CancellationToken cancellationToken)
         {
             if (ThrowOnGetNext)
                 throw new InvalidOperationException("platform unavailable");
             return Task.FromResult(Tasks.Count > 0 ? Tasks.Dequeue() : null);
         }
 
-        public override Task<bool> PostResultAsync(SyncResult result, CancellationToken cancellationToken)
+        public Task<bool> PostResultAsync(SyncResult result, CancellationToken cancellationToken)
         {
             return Task.FromResult(true);
         }

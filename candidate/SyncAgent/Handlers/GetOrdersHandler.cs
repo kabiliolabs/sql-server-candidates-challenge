@@ -64,7 +64,7 @@ ORDER BY d.SalesOrderID, d.SalesOrderDetailID";
             {
                 headers.CommandText = HeadersQuery;
                 headers.CommandTimeout = _options.CommandTimeoutSeconds;
-                headers.Parameters.Add(GetCustomersHandler.ModifiedSinceParameter(modifiedSince));
+                headers.Parameters.Add(SqlParameterHelpers.ModifiedSince(modifiedSince));
                 headers.Parameters.Add(new SqlParameter("@MaxRows", SqlDbType.Int) { Value = _options.MaxRows });
 
                 await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -100,7 +100,7 @@ ORDER BY d.SalesOrderID, d.SalesOrderDetailID";
                 {
                     details.CommandText = DetailsQuery;
                     details.CommandTimeout = _options.CommandTimeoutSeconds;
-                    details.Parameters.Add(GetCustomersHandler.ModifiedSinceParameter(modifiedSince));
+                    details.Parameters.Add(SqlParameterHelpers.ModifiedSince(modifiedSince));
                     details.Parameters.Add(new SqlParameter("@MaxRows", SqlDbType.Int) { Value = _options.MaxRows });
 
                     using (SqlDataReader reader = await details.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))

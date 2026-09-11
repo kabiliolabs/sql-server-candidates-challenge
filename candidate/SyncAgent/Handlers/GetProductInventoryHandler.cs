@@ -49,7 +49,7 @@ ORDER BY i.ProductID";
             {
                 cmd.CommandText = Query;
                 cmd.CommandTimeout = _options.CommandTimeoutSeconds;
-                cmd.Parameters.Add(GetCustomersHandler.ModifiedSinceParameter(modifiedSince));
+                cmd.Parameters.Add(SqlParameterHelpers.ModifiedSince(modifiedSince));
                 cmd.Parameters.Add(new SqlParameter("@MaxRows", SqlDbType.Int) { Value = _options.MaxRows });
 
                 await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
