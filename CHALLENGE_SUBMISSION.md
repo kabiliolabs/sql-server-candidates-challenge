@@ -117,6 +117,16 @@ Point the platform at `http://localhost:5100`; the API key is set in `appsetting
   scaffold, handlers, host, tests, and docs. The agent audited the repo first
   (`docs/api-contract.md`, `docs/sample-payloads/`, and the SyncPlatform source
   in `src/SyncPlatform`) to derive the contract, then built against it.
+- Used **Claude** at the very start, before any code, to read the challenge
+  repo (`CHALLENGE_DESCRIPTION.md`, `README.md`, `docs/api-contract.md`,
+  `docs/sample-payloads/`, and the SyncPlatform source) and summarize the
+  actual requirements — including behavior not spelled out in the top-level
+  description, such as the `204 = no work` semantics, the nested
+  `orderDetails` shape, and the API-key rejection behavior. Also used Claude
+  with a live SQL connection to explore and verify the real AdventureWorks2025
+  schema (tables, columns, foreign keys) before writing any query, instead of
+  relying on memorized/assumed schema. That exploration was published as a
+  browsable reference: https://claude.ai/code/artifact/f5a4d943-01e5-461c-a8ab-227fcbaab294
 - Used **Claude** for plan audit (reviewed the implementation plan before
   coding, caught the phone-column bug and the N+1 orders pattern early) and for
   final implementation audit (independently built the solution, ran both test
