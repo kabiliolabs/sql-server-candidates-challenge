@@ -10,7 +10,7 @@ namespace SyncAgent.Protocol
 {
     /// <summary>Routes tasks to handlers by task type; unknown type or handler failure -->
     /// "failed" result. Never throws (except cancellation).</summary>
-    public sealed class SyncTaskDispatcher
+    public class SyncTaskDispatcher
     {
         private readonly Dictionary<string, ISyncTaskHandler> _handlers;
         private readonly ILogger<SyncTaskDispatcher> _logger;
@@ -21,7 +21,7 @@ namespace SyncAgent.Protocol
             _logger = logger;
         }
 
-        public async Task<SyncResult> DispatchAsync(SyncTask task, CancellationToken cancellationToken)
+        public virtual async Task<SyncResult> DispatchAsync(SyncTask task, CancellationToken cancellationToken)
         {
             ISyncTaskHandler handler;
             if (!_handlers.TryGetValue(task.taskType, out handler))
