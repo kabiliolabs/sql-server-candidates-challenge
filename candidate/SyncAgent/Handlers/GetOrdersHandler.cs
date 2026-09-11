@@ -69,6 +69,7 @@ ORDER BY d.SalesOrderID, d.SalesOrderDetailID";
 
                 await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
                 var byId = new Dictionary<int, OrderRow>();
+                var ordered = new List<OrderRow>();
                 using (SqlDataReader reader = await headers.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
                     int salesOrderId = reader.GetOrdinal("SalesOrderID");
@@ -91,6 +92,7 @@ ORDER BY d.SalesOrderID, d.SalesOrderDetailID";
                             orderDetails = new List<OrderDetailRow>()
                         };
                         byId.Add(order.salesOrderId, order);
+                        ordered.Add(order);
                     }
                 }
 
@@ -128,7 +130,7 @@ ORDER BY d.SalesOrderID, d.SalesOrderDetailID";
                     }
                 }
 
-                foreach (OrderRow order in byId.Values)
+                foreach (OrderRow order in ordered)
                     rows.Add(order);
             }
 

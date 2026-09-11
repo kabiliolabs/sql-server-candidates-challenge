@@ -81,10 +81,19 @@ Point the platform at `http://localhost:5100`; the API key is set in `appsetting
 - **Integration (real LocalDB, `[Category("Integration")]`, env `ADVENTUREWORKS_CONN`):**
   one test per handler — known value checks (customer 11000 → Jon Yang), nested order
   details grouping, `ModifiedSince` filter honored.
-- **Manual E2E**: agent `--console` against running SyncPlatform, all four task types,
-  verify `accepted:true` + `recordCount > 0`.
-- **With more time**: property-based payload tests, platform-side fault injection
-  (flaky network), and service-install integration script.
+- **Manual E2E (executed)**: agent `--console` against the running SyncPlatform
+  (localhost:5100) — all four task buttons produced a processed task:
+  `accepted:true`, HTTP 200, no crash; `GetCustomers` 10000 rows, `GetProducts`
+  504, `GetOrders` 10000 (nested order details), `GetProductInventory` 609,
+  all filtered by the platform's `modifiedSince=2025-01-01Z`.
+- **Hosting layer (Windows Service / SCM lifecycle)**: NOT yet smoke-tested.
+  The ServiceBase code (OnStart fail-fast, EventLog writing, stop path) has
+  never executed under `sc.exe`; the DB-connectivity-expected-to-fail-under-
+  LocalSystem caveat from Known Limitations is part of that. Console mode is
+  fully verified; service mode is implemented but unexercised.
+- **With more time**: property-based payload tests, platform-side fault
+  injection (flaky network), and the service smoke test (`sc create` → start →
+  EventLog → stop → delete).
 
 ---
 
@@ -104,18 +113,29 @@ Point the platform at `http://localhost:5100`; the API key is set in `appsetting
 
 ## AI Tools Used
 
-- Used **opencode** (AI coding agent, model-based) to implement the solution end to
-  end: scaffold, handlers, host, tests, and documentation. The agent also audited the
-  repo (schema, SyncPlatform task queue, payload samples) and reviewed its own diffs
-  against the hidden requirements in `docs/SyncAgentPoC.md`.
+- Used **opencode** (AI coding agent) to implement the solution end to end:
+  scaffold, handlers, host, tests, and docs. The agent audited the repo first
+  (`docs/api-contract.md`, `docs/sample-payloads/`, and the SyncPlatform source
+  in `src/SyncPlatform`) to derive the contract, then built against it.
+- Used **Claude** for plan audit (reviewed the implementation plan before
+  coding, caught the phone-column bug and the N+1 orders pattern early) and for
+  final implementation audit (independently built the solution, ran both test
+  suites, and reviewed the submission for accuracy). The audit fixes applied
+  from that pass: guaranteed order iteration in GetOrdersHandler and the
+  corrections in this document.
 
 ---
 
 ## Time Spent
 
-- ~1.5 h planning + research (schema, API contract, platform behavior)
-- ~3 h implementation (scaffold → handlers → host → tests)
-- ~0.5 h E2E verification and docs
+- Implementation + verification (commits): ~40 minutes (git timestamps
+  2026-09-11 23:18–23:58). Heavy lifting done by the opencode agent; my role
+  was reviewing the plan and accepting/rejecting each layer as it landed.
+- Prior planning and research session (schema exploration, API contract,
+  architecture discussion with Claude): ~1.5 h.
+- Final audit pass (Claude review + fixes): ~30 min.
+- Total: ~2.5 h. Deliberately AI-assisted — the challenge asks for it, and the
+  git history is public evidence of the actual span.
 
 ---
 
