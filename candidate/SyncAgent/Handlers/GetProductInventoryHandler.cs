@@ -73,7 +73,7 @@ ORDER BY i.ProductID";
                             productNumber = reader.GetString(productNumber),
                             locationName = reader.GetString(locationName),
                             shelf = reader.GetStringOrNull(shelf),
-                            bin = reader.GetInt16(bin),
+                            bin = reader.GetByte(bin),
                             quantity = reader.GetInt16(quantity),
                             modifiedDate = reader.GetDateTime(modifiedDate)
                         });
