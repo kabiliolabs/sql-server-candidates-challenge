@@ -2,9 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/SyncAgent.Application/SyncAgent.Application.csproj" />
     <Project Path="src/SyncAgent.Domain/SyncAgent.Domain.csproj" />
+    <Project Path="src/SyncAgent.Infrastructure/SyncAgent.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SyncAgent.Application.Tests/SyncAgent.Application.Tests.csproj" />
     <Project Path="tests/SyncAgent.Domain.Tests/SyncAgent.Domain.Tests.csproj" />
+    <Project Path="tests/SyncAgent.Infrastructure.Tests/SyncAgent.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>
