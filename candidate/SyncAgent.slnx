@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SyncAgent.Tests/SyncAgent.Tests.csproj" />
+  <Project Path="SyncAgent/SyncAgent.csproj" />
+</Solution>
