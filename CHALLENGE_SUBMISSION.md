@@ -294,20 +294,15 @@ session rather than reconstructed afterward.
 
 ## Time Spent
 
-Roughly 4-5 hours across one day, against the README's ~2h estimate and the
-4-day submission window:
+About 1.5 hours in one sitting (11:00–12:35), close to the README's ~2h estimate:
 
-- Environment setup (SQL Server 2025 install/troubleshooting, DB restore): ~45 min
-- Planning review and technology decisions: ~30 min
-- MVP implementation (all four task types, working end-to-end): ~1.5h, including
-  live debugging against the real simulator
-- Robustness pass (Mediator, log4net, HTTP resilience, test suite): ~1.5h
-- Code review and fixes: ~20 min
-- This document: ~20 min
-
-I chose to exceed the 2h estimate deliberately, given the 4-day window and the
-value of verifying against a real running simulator rather than stopping at
-"the code looks right."
+- Environment setup (SQL Server 2025 install/troubleshooting, DB restore): ~20 min
+- Planning review and technology decisions: ~15 min
+- MVP implementation (all four task types, working end-to-end, including live
+  debugging against the real simulator): ~30 min
+- Robustness pass (Mediator, log4net, HTTP resilience, test suite): ~15 min
+- Code review and fixes: ~10 min
+- This document: ~5 min
 
 ---
 
