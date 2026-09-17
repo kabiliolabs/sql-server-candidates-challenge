@@ -142,4 +142,37 @@ the git remote until there's code to push.
 
 ---
 
+## 2026-09-17 — Technology stack decisions
+
+**Asked:** User specified the desired stack: a Mediator library for handlers,
+log4net for logging (careful not to log PII), circuit breaker/retry/throttling for
+HTTP calls, connection string from env var, Dapper for DB mapping, and "any other
+mechanism that makes this app more robust."
+
+**AI did:** Flagged two choices that needed disambiguation before scaffolding
+anything, since getting them wrong would mean redoing work later:
+- "Mediator" is ambiguous between MediatR (whose recent major versions require a
+  commercial license above a revenue threshold — a real concern for code written
+  for an employer) and the unrelated `Mediator` package by martinothamar
+  (source-generator based, MIT licensed). Asked which was meant, and also offered a
+  zero-dependency hand-rolled option.
+- For HTTP resilience, asked whether to use `Microsoft.Extensions.Http.Resilience`
+  (the official .NET 8 wrapper around Polly v8, integrates with
+  `HttpClientFactory`) or wire Polly directly.
+- Asked what exactly "PII" should exclude from log4net logs (metadata-only vs.
+  allowing full row data at Debug level).
+- Asked what the "configurable throttling" requirement should actually rate-limit
+  (outbound HTTP calls only, vs. also DB query execution).
+
+**I did:** Chose the recommended option on all four: `Mediator` (martinothamar) for
+the mediator; metadata-only logging with log4net (no row data, connection strings,
+or API key at any log level); `Microsoft.Extensions.Http.Resilience` for retry/
+circuit-breaker/timeout; and self-throttling on outbound platform calls only.
+
+**Final stack:** Mediator (martinothamar) · log4net · Dapper ·
+Microsoft.Extensions.Http.Resilience · env-var config with fail-fast validation ·
+xUnit.
+
+---
+
 <!-- Add new entries above this line as work continues. -->
