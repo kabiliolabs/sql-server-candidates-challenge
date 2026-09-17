@@ -65,14 +65,21 @@ public static class ServiceCollectionExtensions
                 // Order mirrors Microsoft's own standard resilience handler: rate limiter
                 // outermost (self-throttle before spending any time), then timeout/retry/circuit
                 // breaker guarding each attempt.
-                builder.AddRateLimiter(new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
+                var rateLimiter = new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
                 {
                     PermitLimit = resilience.MaxRequestsPerSecond,
                     Window = TimeSpan.FromSeconds(1),
                     SegmentsPerWindow = 4,
                     QueueLimit = resilience.RateLimiterQueueLimit,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-                }));
+                });
+                // AddRateLimiter(RateLimiter) treats an externally-supplied limiter as
+                // caller-owned and never disposes it. HttpClientFactory rebuilds this handler
+                // (and re-runs this whole callback) roughly every 2 minutes by default for a
+                // long-running process, so without this, each rotation would leak the previous
+                // limiter's internal replenishment timer.
+                context.OnPipelineDisposed(rateLimiter.Dispose);
+                builder.AddRateLimiter(rateLimiter);
 
                 builder.AddRetry(new HttpRetryStrategyOptions
                 {

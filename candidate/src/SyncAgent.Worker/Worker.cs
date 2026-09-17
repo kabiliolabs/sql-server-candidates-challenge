@@ -13,8 +13,14 @@ public sealed class Worker(
     ISyncPlatformClient platformClient,
     SyncTaskDispatcher dispatcher,
     IOptions<SyncAgentOptions> options,
-    ILogger<Worker> logger) : BackgroundService
+    ILogger<Worker> logger,
+    TimeProvider? timeProvider = null) : BackgroundService
 {
+    // Defaults to the real clock in production (DI never supplies this parameter); tests pass
+    // a FakeTimeProvider so the poll loop can be driven deterministically by advancing virtual
+    // time instead of waiting on real wall-clock delays.
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var pollInterval = TimeSpan.FromSeconds(options.Value.PollIntervalSeconds);
@@ -40,7 +46,7 @@ public sealed class Worker(
 
             try
             {
-                await Task.Delay(pollInterval, stoppingToken);
+                await Task.Delay(pollInterval, _timeProvider, stoppingToken);
             }
             catch (OperationCanceledException)
             {

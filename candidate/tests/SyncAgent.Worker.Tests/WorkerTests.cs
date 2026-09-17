@@ -2,6 +2,7 @@ using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using SyncAgent.Core.Abstractions;
 using SyncAgent.Core.Configuration;
 using SyncAgent.Core.Dispatch;
@@ -12,8 +13,10 @@ namespace SyncAgent.Worker.Tests;
 
 public class WorkerTests
 {
-    private static IOptions<SyncAgentOptions> FastPollOptions() =>
-        Options.Create(new SyncAgentOptions { PollIntervalSeconds = 1, MaxRowsPerTask = 5000 });
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
+
+    private static IOptions<SyncAgentOptions> PollOptions() =>
+        Options.Create(new SyncAgentOptions { PollIntervalSeconds = (int)PollInterval.TotalSeconds, MaxRowsPerTask = 5000 });
 
     // No task type is ever actually dispatched to a real handler in these tests — the
     // Worker-loop behaviors under test (keep polling after an error, never post without a
@@ -31,49 +34,62 @@ public class WorkerTests
         services.AddSingleton<ISyncQueryRepository<ProductInventoryRecord>>(new EmptyRepository<ProductInventoryRecord>());
         services.AddMediator();
         var provider = services.BuildServiceProvider();
-        return new SyncTaskDispatcher(provider.GetRequiredService<ISender>(), FastPollOptions());
+        return new SyncTaskDispatcher(provider.GetRequiredService<ISender>(), PollOptions());
     }
 
-    private sealed class EmptyRepository<TRecord> : ISyncQueryRepository<TRecord>
+    /// <summary>Polls (real wall-clock, but with a short interval and generous timeout — this
+    /// is only waiting for the Worker's background Task to process a FakeTimeProvider advance,
+    /// not for the poll interval itself) until <paramref name="condition"/> is true or the
+    /// timeout elapses. Keeps the tests deterministic about *how many* poll cycles happen
+    /// (driven explicitly by advancing virtual time) without being sensitive to real scheduling
+    /// jitter for *when* each cycle's async continuations actually run.</summary>
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
     {
-        public Task<IReadOnlyList<TRecord>> GetModifiedSinceAsync(DateTimeOffset modifiedSince, int maxRows, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<TRecord>>([]);
+        var deadline = DateTime.UtcNow + timeout;
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(condition(), "Condition was not met within the timeout.");
     }
 
     [Fact]
     public async Task ExecuteAsync_PlatformThrowsOnEveryPoll_LoopKeepsRunningInsteadOfCrashing()
     {
+        var fakeTime = new FakeTimeProvider();
         var client = new FakeSyncPlatformClient(() => throw new HttpRequestException("platform unreachable"));
-        var dispatcher = CreateDispatcher();
-        var worker = new global::SyncAgent.Worker.Worker(client, dispatcher, FastPollOptions(), NullLogger<global::SyncAgent.Worker.Worker>.Instance);
+        var worker = new global::SyncAgent.Worker.Worker(client, CreateDispatcher(), PollOptions(), NullLogger<global::SyncAgent.Worker.Worker>.Instance, fakeTime);
 
         using var cts = new CancellationTokenSource();
-        var executeTask = worker.StartAsync(cts.Token);
+        await worker.StartAsync(cts.Token);
+        await WaitUntilAsync(() => client.GetNextTaskCallCount >= 1, TimeSpan.FromSeconds(2));
 
-        // Let it fail a couple of poll cycles, then stop — if the loop had let the exception
-        // escape, StartAsync/ExecuteAsync would have faulted instead of completing normally.
-        await Task.Delay(TimeSpan.FromSeconds(2.5));
+        // If the exception had escaped the loop instead of being caught, this advance would
+        // never produce a second poll — the background Task would already be faulted/completed.
+        fakeTime.Advance(PollInterval);
+        await WaitUntilAsync(() => client.GetNextTaskCallCount >= 2, TimeSpan.FromSeconds(2));
+
         await cts.CancelAsync();
         await worker.StopAsync(CancellationToken.None);
 
-        Assert.True(client.GetNextTaskCallCount >= 2, $"expected at least 2 poll attempts, got {client.GetNextTaskCallCount}");
         Assert.Equal(0, client.PostResultCallCount);
     }
 
     [Fact]
     public async Task ExecuteAsync_NoTaskQueued_NeverPostsAResult()
     {
+        var fakeTime = new FakeTimeProvider();
         var client = new FakeSyncPlatformClient(() => null);
-        var dispatcher = CreateDispatcher();
-        var worker = new global::SyncAgent.Worker.Worker(client, dispatcher, FastPollOptions(), NullLogger<global::SyncAgent.Worker.Worker>.Instance);
+        var worker = new global::SyncAgent.Worker.Worker(client, CreateDispatcher(), PollOptions(), NullLogger<global::SyncAgent.Worker.Worker>.Instance, fakeTime);
 
         using var cts = new CancellationTokenSource();
         await worker.StartAsync(cts.Token);
-        await Task.Delay(TimeSpan.FromSeconds(1.5));
+        await WaitUntilAsync(() => client.GetNextTaskCallCount >= 1, TimeSpan.FromSeconds(2));
+
         await cts.CancelAsync();
         await worker.StopAsync(CancellationToken.None);
 
-        Assert.True(client.GetNextTaskCallCount >= 1);
         Assert.Equal(0, client.PostResultCallCount);
     }
 
@@ -89,6 +105,7 @@ public class WorkerTests
         };
 
         var served = false;
+        var fakeTime = new FakeTimeProvider();
         var client = new FakeSyncPlatformClient(() =>
         {
             if (served)
@@ -99,18 +116,24 @@ public class WorkerTests
             served = true;
             return task;
         });
-        var dispatcher = CreateDispatcher();
-        var worker = new global::SyncAgent.Worker.Worker(client, dispatcher, FastPollOptions(), NullLogger<global::SyncAgent.Worker.Worker>.Instance);
+        var worker = new global::SyncAgent.Worker.Worker(client, CreateDispatcher(), PollOptions(), NullLogger<global::SyncAgent.Worker.Worker>.Instance, fakeTime);
 
         using var cts = new CancellationTokenSource();
         await worker.StartAsync(cts.Token);
-        await Task.Delay(TimeSpan.FromSeconds(1.5));
+        await WaitUntilAsync(() => client.PostResultCallCount >= 1, TimeSpan.FromSeconds(2));
+
         await cts.CancelAsync();
         await worker.StopAsync(CancellationToken.None);
 
         Assert.Equal(1, client.PostResultCallCount);
         Assert.Equal(SyncResultStatus.Failed, client.LastPostedResult?.Status);
         Assert.Equal("t1", client.LastPostedResult?.TaskId);
+    }
+
+    private sealed class EmptyRepository<TRecord> : ISyncQueryRepository<TRecord>
+    {
+        public Task<IReadOnlyList<TRecord>> GetModifiedSinceAsync(DateTimeOffset modifiedSince, int maxRows, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<TRecord>>([]);
     }
 
     private sealed class FakeSyncPlatformClient(Func<SyncTask?> getNextTask) : ISyncPlatformClient

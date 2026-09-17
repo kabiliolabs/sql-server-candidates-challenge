@@ -1,10 +1,11 @@
 # Implementation Plan — SQL Server Sync Agent
 
-Status: **MVP implemented and verified end-to-end** (all four task types tested
-live against the real database and the running SyncPlatform simulator). This
-document is now a living record of the design — updated as it evolved, not just
-the pre-code plan. Robustness work (Mediator, log4net, HTTP resilience/throttling)
-comes next.
+Status: **Implemented and verified end-to-end, robustness pass included** (all
+four task types tested live against the real database and the running
+SyncPlatform simulator, both before and after adding Mediator, log4net, and HTTP
+resilience). This document is a living record of the design — updated as it
+evolved, not just the pre-code plan. See §11 for exactly what's done vs. what's
+left for more time.
 
 ---
 
@@ -26,24 +27,29 @@ candidate/
 ├── src/
 │   ├── SyncAgent.Core/            (no I/O — portable to .NET Framework 4.8)
 │   │   ├── Tasks/                 task type DTOs, per-record types, SyncTask/SyncResult
-│   │   ├── Abstractions/          ISyncTaskHandler, ISyncQueryRepository<TRecord>,
-│   │   │                          ISyncPlatformClient
+│   │   ├── Abstractions/          ISyncQueryRepository<TRecord>, ISyncPlatformClient
 │   │   ├── Configuration/         SyncAgentOptions (+ validator), DI registration
-│   │   ├── Handlers/              one ISyncTaskHandler per task type — thin, each just
-│   │   │                          calls its ISyncQueryRepository<TRecord>
-│   │   └── Dispatch/              SyncTaskDispatcher (allow-list + never throws)
-│   ├── SyncAgent.Infrastructure/  (Dapper, HttpClient, log4net wiring)
+│   │   ├── Queries/                IRequest<IReadOnlyList<object>> per task type (Mediator)
+│   │   ├── Handlers/              one IRequestHandler<TQuery,...> per task type — thin,
+│   │   │                          each just calls its ISyncQueryRepository<TRecord>
+│   │   └── Dispatch/              SyncTaskDispatcher (taskType string → query, via
+│   │                              Mediator's ISender; never throws),
+│   │                              LoggingPipelineBehavior (cross-cutting duration/count log)
+│   ├── SyncAgent.Infrastructure/  (Dapper, HttpClient + resilience, log4net wiring)
 │   │   ├── Data/                  connection factory, SqlOptions, one Repository +
 │   │   │                          SQL query text + (where needed) an internal Row type
 │   │   │                          per task type
 │   │   └── Platform/              SyncPlatformClient (typed HttpClient), PlatformOptions,
-│   │                              ApiKeyDelegatingHandler, wire DTOs
-│   └── SyncAgent.Worker/          BackgroundService host, composition root (Program.cs)
+│   │                              ResilienceOptions, ApiKeyDelegatingHandler, wire DTOs
+│   └── SyncAgent.Worker/          BackgroundService host, composition root (Program.cs),
+│                                  log4net.config
 └── tests/
-    ├── SyncAgent.Core.Tests/      handler dispatch, validation, PII-safety of log calls
+    ├── SyncAgent.Core.Tests/      dispatcher tests on a real Mediator pipeline
     ├── SyncAgent.Infrastructure.Tests/  contract tests vs docs/sample-payloads/*.json;
-    │                                    SQL query tests gated by env var (skip without DB)
-    └── SyncAgent.Worker.Tests/    polling loop behavior with fake HttpMessageHandler
+    │                                    SQL integration tests gated by env var (skip
+    │                                    without DB)
+    └── SyncAgent.Worker.Tests/    polling loop behavior with a fake ISyncPlatformClient
+                                   and a FakeTimeProvider (deterministic, no real delays)
 ```
 
 **Query-strategy pairing:** each handler pairs with exactly one narrow
@@ -309,8 +315,12 @@ planned in §2:
     guard pinning `GetProductInventory` to the correct 609-row count (filtering on
     `ProductInventory.ModifiedDate`) rather than the documented trap's 1,069.
 - `SyncAgent.Worker.Tests` (3): the polling loop against a fake
-  `ISyncPlatformClient` — the platform throwing on every poll doesn't crash the
-  loop (`StartAsync`/`StopAsync` complete normally); a `204` never triggers a
+  `ISyncPlatformClient`, driven by a `FakeTimeProvider` (`Worker` takes an
+  optional `TimeProvider`, defaulting to the real clock in production) so poll
+  cycles are triggered by explicitly advancing virtual time rather than waiting
+  on real wall-clock delays — deterministic, not sensitive to CI scheduling
+  jitter. Covers: the platform throwing on every poll doesn't crash the loop
+  (`StartAsync`/`StopAsync` complete normally); a `204` never triggers a
   POST; a task with an unrecognized type still gets a `"failed"` result posted
   back exactly once.
 
