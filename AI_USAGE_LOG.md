@@ -113,4 +113,33 @@ and verified the git repository, its commit, and its branch survived the move in
 
 ---
 
+## 2026-09-17 — Planning review before writing code
+
+**Asked:** Review the prior planning work (done with another AI tool, "Hermes") for
+consistency, and ask whatever questions are needed before starting the implementation.
+
+**AI did:**
+- Cross-checked `CHEATSHEET.md`, `SETUP_WINDOWS.md`, and `RESEARCH-NOTES-PRIVATE.md`
+  against each other and against the real `docs/api-contract.md` and sample payloads.
+  Found them internally consistent (matching row counts, join paths, and design
+  decisions) and confirmed two of the prep notes' claims directly against the sample
+  data: the `GetOrders` sample's `orderDate` (2022) vs. its `modifiedSince` (2025)
+  confirms the filter really is on `ModifiedDate`; `phone` genuinely has no match in
+  AdventureWorks.
+- Identified four points the prior planning had left as open trade-offs rather than
+  firm decisions, and asked the user to choose:
+  1. `phone` field handling (null vs. `Person.PhoneNumber` join)
+  2. Whether to actually multi-target `net8.0;net48` or just document the
+     portability argument
+  3. How the row-limit security measure (`TOP(@n)`) should interact with the
+     `recordCount == data.Length` contract requirement
+  4. Whether to set up the fork/PR git remote now or later
+
+**I did:** Chose the recommended option on all four questions: return `null` for
+phone; target net8.0 only with a written portability note; use a `TOP(@n)` cap
+documented as a known limitation rather than building real pagination; hold off on
+the git remote until there's code to push.
+
+---
+
 <!-- Add new entries above this line as work continues. -->
