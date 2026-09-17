@@ -60,3 +60,6 @@ $RECYCLE.BIN/
 
 ## User-specific
 *.DotSettings.user
+
+## Private prep notes (not part of the submission)
+CHEATSHEET-local.md
