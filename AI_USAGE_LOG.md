@@ -280,4 +280,67 @@ in the simulator's GUI so the AI could observe the live request/response payload
 
 ---
 
+## 2026-09-17 — Robustness pass: resilience, log4net, Mediator, tests
+
+**Asked:** "Let's get this fail safe" — proceed with the robustness work deferred
+from the MVP (HTTP resilience, log4net, Mediator, tests).
+
+**AI did:**
+- Added `Microsoft.Extensions.Http.Resilience` to `SyncPlatformClient`'s pipeline:
+  rate limiter (self-throttle, outermost), retry (exponential backoff + jitter),
+  circuit breaker, and timeout — all via a new `ResilienceOptions` (validated,
+  configurable under `SyncAgent:Platform:Resilience`). Smoke-tested live against
+  the real simulator to confirm the happy path (204 responses) wasn't affected —
+  no spurious retries, correct Polly telemetry in the logs.
+- Wired in log4net as the sole logging sink (`ClearProviders()` +
+  `AddLog4Net("log4net.config")`), console + daily-rolling file, with `Polly` and
+  `System.Net.Http.HttpClient` categories tuned down to `WARN` to cut noise. The
+  config file documents the existing PII policy in a comment rather than
+  introducing new filtering — the code already only ever logs metadata. Verified
+  both sinks live (console output and the actual `logs/syncagent.log` file
+  contents).
+- Migrated dispatch from the hand-rolled `SyncTaskDispatcher`/`ISyncTaskHandler`
+  pair to the **Mediator** library (martinothamar) as originally specified: one
+  `IRequest<IReadOnlyList<object>>` query record + one
+  `IRequestHandler<TQuery,...>` per task type in Core, plus a
+  `LoggingPipelineBehavior<TRequest,TResponse>` — a decorator wrapping every
+  request with duration/record-count logging, so that concern lives in one place
+  instead of inside each handler. `SyncTaskDispatcher` still keeps a small
+  taskType-string → query-construction map, since Mediator dispatch is
+  compile-time typed but the platform's `taskType` arrives as an untyped runtime
+  string — documented as the one place a new task type costs more than "one line."
+- Wrote the test suite: 6 dispatcher tests in `SyncAgent.Core.Tests` (built on a
+  *real* Mediator pipeline via a throwaway `ServiceCollection`, not a hand-rolled
+  fake `ISender` — exercises the same resolution path production uses), 3 worker
+  loop-resilience tests in `SyncAgent.Worker.Tests` (platform-throws-forever
+  doesn't crash the loop; 204 never posts; unknown task type still posts
+  "failed"), and 8 tests in `SyncAgent.Infrastructure.Tests` — 4 contract tests
+  comparing each record type's serialized JSON shape against
+  `docs/sample-payloads/result-*.json` (all passed on the first run) and 4 SQL
+  integration tests gated by `SYNCAGENT_TEST_DB_CONNECTION` via a custom
+  `[SkippableFact]`, including a regression guard pinning the ProductInventory
+  609-row count against the documented 1,069-row trap. All 17 pass; ran them both
+  with and without the DB env var set to confirm the skip behavior is clean
+  (reported as skipped, not failed) when no database is available.
+- Hit and fixed a real gotcha while writing the dispatcher tests: `AddMediator()`
+  is generated inside the Core assembly and auto-registers *every* real handler
+  found there; resolving `ISender` eagerly builds Mediator's dispatch table, so
+  even a test targeting one query needs all four real handlers' dependencies
+  (`ISyncQueryRepository<TRecord>`) to be resolvable. Fixed by registering no-op
+  fake repositories for all four record types in the test helper before
+  overriding the handler under test.
+- Ran one more full live end-to-end smoke test after all of the above landed
+  (real simulator + real database + real Worker process) to confirm the whole
+  stack works together, not just in isolation — confirmed via the log file that
+  the pipeline behavior, log4net, and the resilience-wrapped HTTP client all fired
+  correctly in the same request.
+- Updated `docs/IMPLEMENTATION_PLAN.md` throughout to move every "planned" item to
+  "implemented," documenting the Mediator testing gotcha and the final test
+  breakdown.
+
+**I did:** Asked for the robustness pass, and clicked the "Customers" button one
+more time in the simulator's GUI to trigger the final live verification.
+
+---
+
 <!-- Add new entries above this line as work continues. -->

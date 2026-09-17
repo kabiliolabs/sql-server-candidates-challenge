@@ -131,14 +131,16 @@ on the second query.
 
 ## 4. Dispatcher, handlers, and repository design
 
-**Current state (MVP):** a plain `SyncTaskDispatcher` in Core resolves
-`ISyncTaskHandler` by `taskType` from an allow-list built from DI-registered
-handlers — no Mediator library wired in yet. The Mediator (martinothamar,
-source-generated, MIT licensed — not MediatR, whose recent major versions require
-a commercial license) is still the intended library for the robustness pass; the
-handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
-`IRequestHandler<TRequest, TResponse>` so swapping the dispatcher for
-`ISender.Send()` later is a mechanical change, not a redesign.
+Dispatch now runs on **Mediator** (martinothamar — source-generated, MIT licensed;
+not MediatR, whose recent major versions require a commercial license). Each task
+type is an `IRequest<IReadOnlyList<object>>` record in `Core/Queries/` with a
+matching `IRequestHandler<TQuery, IReadOnlyList<object>>` in `Core/Handlers/`.
+`SyncTaskDispatcher` still needs a small `taskType`-string → query-construction map
+(`SyncTaskDispatcher.QuerySenders`) — the platform's `taskType` arrives as an
+untyped runtime string, but Mediator dispatch is compile-time typed, so that map is
+the one place a new task type costs more than "one class, one DI line": one
+dictionary entry, constructing that task's query from the validated request plus
+the configured row cap.
 
 - **Segregated repository interfaces:** `ISyncQueryRepository<TRecord>` (Core) is
   one generic interface closed over each task's record type
@@ -147,8 +149,8 @@ handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
   depends only on this interface; all Dapper/SQL specifics live in the
   Infrastructure implementation, which is what keeps Core free of I/O
   dependencies (the .NET Framework 4.8 portability argument in §10 actually holds).
-- **Query-strategy pairing:** each `ISyncTaskHandler` (Core/Handlers/) takes exactly
-  one `ISyncQueryRepository<TRecord>` and calls it once — see §2.
+- **Query-strategy pairing:** each handler (`Core/Handlers/`) takes exactly one
+  `ISyncQueryRepository<TRecord>` and calls it once — see §2.
 - **Result type instead of exceptions for expected failures:** `SyncTaskDispatcher`
   handles the two *expected* failure modes — an unrecognized `taskType`, or a
   missing/malformed `modifiedSince` — with plain `if` checks that return a
@@ -157,12 +159,14 @@ handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
   etc.) and are caught once, centrally, in the dispatcher's `try/catch`, also
   converted to `SyncResult.Failed(...)`. Either way the dispatcher never throws
   past itself, so the worker loop can always post something back.
-- **Decorator/pipeline behaviors for cross-cutting concerns (planned, not yet
-  implemented):** once Mediator is wired in, per-task logging (duration, record
-  count) and future concerns like metrics should be `IPipelineBehavior<TRequest,
-  TResponse>` wrapping every handler, rather than logging calls embedded inside
-  each handler. Deferred to the robustness pass so it lands alongside the actual
-  Mediator migration instead of being built twice.
+- **Decorator/pipeline behavior for cross-cutting logging:**
+  `LoggingPipelineBehavior<TRequest, TResponse>` (`Core/Dispatch/`) is a generic
+  `IPipelineBehavior<TRequest, TResponse>` wrapping every Mediator request, logging
+  duration and record count — metadata only, never the request/response payload.
+  This is what moved the "how long did this take, how many records" concern out of
+  each handler and into exactly one place; handlers only fetch and shape data.
+  Verified live: `LoggingPipelineBehavior - GetCustomersQuery handled in 442ms
+  (5000 records)` appeared correctly in the log during manual end-to-end testing.
 - **Four explicit handler classes, not one generic one:** all four handlers end up
   the same shape (fetch via the repository, cast to `object`). Kept as four
   explicit classes rather than a `SyncTaskHandler<TRecord>` generic — matches the
@@ -170,6 +174,13 @@ handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
   dispatcher/handler layer during planning, stays trivially readable, and a 5th
   task type is free to diverge (e.g. extra validation) without fighting a shared
   base.
+- **Testing gotcha worth documenting:** `AddMediator()` is generated inside the
+  Core assembly and auto-registers *every* real `IRequestHandler<,>` it finds
+  there — and resolving `ISender` eagerly builds Mediator's dispatch table, which
+  means all four real handlers' constructor dependencies must be satisfiable even
+  in a unit test that only exercises one of them. `SyncTaskDispatcherTests` and
+  `WorkerTests` both register no-op `ISyncQueryRepository<TRecord>` fakes for all
+  four record types up front, then override just the handler under test.
 
 ---
 
@@ -190,15 +201,27 @@ handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
 
 ## 6. HTTP client & resilience
 
+**Implemented and verified against the live simulator** (happy path unaffected —
+204s pass straight through, Polly telemetry visible at Trace/Info without extra
+retries triggered on non-error responses).
+
 - Typed `HttpClient` (`SyncPlatformClient`) registered via `HttpClientFactory`.
 - Resilience pipeline via `Microsoft.Extensions.Http.Resilience`
-  (`AddResilienceHandler`), covering:
-  - **Retry** — transient failures (5xx, network errors), exponential backoff.
-  - **Circuit breaker** — stops hammering the platform if it's down.
-  - **Timeout** — per-attempt and total.
-  - **Rate limiter** — configurable max requests/sec self-throttle on both polling
-    and result-posting, so a misconfigured poll interval or a retry storm can't
-    hammer the platform.
+  (`AddResilienceHandler("sync-platform", ...)`), all tunables configurable under
+  `SyncAgent:Platform:Resilience` and validated at startup
+  (`ResilienceOptionsValidator`):
+  - **Rate limiter** (outermost) — `SlidingWindowRateLimiter`, configurable max
+    requests/sec (`MaxRequestsPerSecond`, default 10) — a defense against a
+    misconfigured poll interval or a retry storm hammering the platform,
+    independent of anything the platform itself does.
+  - **Retry** — transient failures (5xx, network errors), exponential backoff with
+    jitter, configurable max attempts.
+  - **Circuit breaker** — opens after a configurable failure ratio over a sampling
+    window, stops hammering the platform while it's down.
+  - **Timeout** — per-attempt, configurable.
+  - Order mirrors Microsoft's own standard resilience handler (rate limiter →
+    timeout/retry/circuit-breaker guarding each attempt), documented in the code
+    comment in `ServiceCollectionExtensions.AddSyncAgentInfrastructure`.
 - `X-Api-Key` attached via a `DelegatingHandler`, never logged.
 
 ---
@@ -213,15 +236,16 @@ handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
 - **Options pattern with fail-fast validation:** each settings group is its own
   options type — `SyncAgentOptions` (Core: `MaxRowsPerTask`, `PollIntervalSeconds`),
   `SqlOptions` (Infrastructure: `ConnectionString`, `CommandTimeoutSeconds`),
-  `PlatformOptions` (Infrastructure: `BaseUrl`, `ApiKey`) — each with a matching
-  `IValidateOptions<T>` and registered with `.ValidateOnStart()`. `Program.cs`
-  additionally resolves every `IOptions<T>.Value` explicitly right after
-  `host.Build()`, in a small helper that catches `OptionsValidationException` and
-  logs every individual failure via `ILogger` at `Critical` before exiting with a
-  non-zero code — so a missing env var or a bad numeric setting produces one clear
-  log line per problem (e.g. "Configuration error (SqlOptions): ConnectionString is
-  required...") instead of a stack trace on the first task, or the host silently
-  polling with an empty connection string.
+  `PlatformOptions` (Infrastructure: `BaseUrl`, `ApiKey`), `ResilienceOptions`
+  (Infrastructure: retry/circuit-breaker/timeout/rate-limiter tunables) — each with
+  a matching `IValidateOptions<T>` and registered with `.ValidateOnStart()`.
+  `Program.cs` additionally resolves every `IOptions<T>.Value` explicitly right
+  after `host.Build()`, in a small helper that catches `OptionsValidationException`
+  and logs every individual failure via `ILogger` at `Critical` before exiting with
+  a non-zero code — so a missing env var or a bad numeric setting produces one
+  clear log line per problem (e.g. "Configuration error (SqlOptions):
+  ConnectionString is required...") instead of a stack trace on the first task, or
+  the host silently polling with an empty connection string.
 - SQL 100% parameterized (`@modifiedSince`, `@n`, `@SalesOrderIds`) — no string
   concatenation.
 - `taskType` allow-listed against the four known values; anything else fails
@@ -235,30 +259,65 @@ handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
 
 ## 8. Logging (log4net)
 
+**Implemented.** log4net is the sole logging sink — `builder.Logging.ClearProviders()`
++ `AddLog4Net("log4net.config")` in `Program.cs`, so every log line (including the
+framework's own `Microsoft.Hosting.Lifetime` and `HttpClientFactory` messages)
+goes through one PII-safe config, on both console and a daily-rolling file
+(`logs/syncagent.log`, 14-day retention).
+
 - Metadata only, at every log level: task type, `taskId`, record counts,
-  durations, HTTP status codes, exception types and messages.
+  durations (via `LoggingPipelineBehavior`, see §4), HTTP status codes, exception
+  types and messages.
 - **Never logged:** row-level data (customer names, emails, addresses, product
-  data), the connection string, or the API key.
-- Log calls are covered by a Core-level test asserting handler results aren't
-  passed whole into logger calls (guards against a future accidental
-  `_logger.LogDebug(result)`-style regression).
+  data), the connection string, or the API key. `log4net.config` documents this
+  policy in a comment at the top — the config doesn't filter anything out, because
+  nothing unsafe should ever reach it in the first place.
+- `Polly` and `System.Net.Http.HttpClient` categories are tuned to `WARN` by
+  default — both are metadata-only (no body content, so no PII risk) but noisy at
+  `INFO` for normal operation.
+- Verified live: the file sink correctly recorded a full poll → dispatch →
+  complete cycle during manual testing, including the pipeline behavior's
+  duration/record-count line.
 
 ---
 
 ## 9. Testing strategy
 
-- **xUnit**, split by project as shown in §2.
-- `SyncAgent.Core.Tests`: dispatcher resolves the right handler per task type;
-  unknown task type is rejected; validation of `modifiedSince` parsing.
-- `SyncAgent.Infrastructure.Tests`:
-  - Contract tests — shape of each handler's output JSON compared against
-    `docs/sample-payloads/result-*.json` (structure/field names, not literal
-    values, since the real DB won't match the doc's example rows exactly).
-  - SQL integration tests gated by an environment variable (e.g.
-    `SYNCAGENT_TEST_DB=1`) so `dotnet test` passes with no database available.
-- `SyncAgent.Worker.Tests`: polling loop against a fake `HttpMessageHandler` —
-  204 keeps polling, 200 dispatches, exceptions during dispatch still POST
-  `status:"failed"` and the loop continues.
+**17 tests, all passing** (`dotnet test SyncAgent.sln`). Split by project as
+planned in §2:
+
+- `SyncAgent.Core.Tests` (6): `SyncTaskDispatcherTests` — unknown task type and
+  missing/malformed `modifiedSince` return `"failed"` without throwing; a handler
+  exception is caught and becomes a `"failed"` result with the exception's
+  message; a successful dispatch returns `"completed"` with `recordCount` matching
+  the data length; multiple registered handlers resolve to the correct one by
+  `taskType`. Built on a **real Mediator pipeline** (`ServiceCollection` +
+  `AddMediator()` + test-only handler overrides), not a hand-rolled fake `ISender`
+  — exercises the same handler-resolution path production uses.
+- `SyncAgent.Infrastructure.Tests` (8):
+  - `SamplePayloadContractTests` (4) — the JSON *shape* (property name set) of
+    each record type, serialized with the same `JsonSerializerOptions` as
+    `SyncPlatformClient`, compared against `docs/sample-payloads/result-*.json`'s
+    first data element (and, for `GetOrders`, the nested `orderDetails[0]` too).
+    Structure only, not literal values — the real DB won't match the doc's
+    example rows exactly. All four passed on the first run, confirming the
+    record types' property names line up with the documented contract exactly.
+  - `RepositoryIntegrationTests` (4) — the real Dapper queries against a real
+    database, gated by `SYNCAGENT_TEST_DB_CONNECTION` (a connection string env
+    var) via a custom `[SkippableFact]` so `dotnet test` reports them as
+    **skipped** (not failed) with no database available. Includes a regression
+    guard pinning `GetProductInventory` to the correct 609-row count (filtering on
+    `ProductInventory.ModifiedDate`) rather than the documented trap's 1,069.
+- `SyncAgent.Worker.Tests` (3): the polling loop against a fake
+  `ISyncPlatformClient` — the platform throwing on every poll doesn't crash the
+  loop (`StartAsync`/`StopAsync` complete normally); a `204` never triggers a
+  POST; a task with an unrecognized type still gets a `"failed"` result posted
+  back exactly once.
+
+**Not yet covered:** the log4net PII policy is enforced by convention (every log
+call in the codebase only passes metadata — verifiable by inspection) rather than
+by an automated guard test; a test that intercepts `ILogger` calls and asserts no
+row-level data is ever passed would be the next addition with more time.
 
 ---
 
@@ -276,20 +335,37 @@ handler shape below (`ExecuteAsync(request, ct)`) was deliberately kept close to
   rigorously true after moving Dapper entirely into Infrastructure repositories)
   and is portable to .NET Framework 4.8 for Kabilio's actual on-prem client
   runtimes, but that portability isn't verified in code for this submission.
-- No unit/integration tests written yet — next after this MVP milestone.
+- No automated PII-policy guard test (see §9) — the "no row data in logs" rule is
+  enforced by convention/code review, not a test that would fail if violated.
+- No requeue/idempotency test coverage beyond what the manual testing and
+  `WorkerTests` demonstrate for the loop-level behavior.
 
 ---
 
 ## 11. Status and next steps
 
-**Done:** solution scaffolded, all four task types implemented and manually
+**Done — MVP:** solution scaffolded, all four task types implemented and manually
 verified end-to-end against the live database and the running SyncPlatform
-simulator (poll → query → post, correct `completed`/`failed` status, correct
-`recordCount`, payload shapes matching the sample payloads). Two real bugs found
-during that manual testing (Dapper's `DateTime`/`DateTimeOffset` constructor
-mismatch; SQL Server's 2,100-parameter limit hit by `GetOrders`' detail query) were
-fixed and are documented in §3. One correction to the pre-code planning notes
-(customer count 19,820 → 19,119) is documented there too.
+simulator. Two real bugs found during that manual testing (Dapper's
+`DateTime`/`DateTimeOffset` constructor mismatch; SQL Server's 2,100-parameter
+limit hit by `GetOrders`' detail query) were fixed and are documented in §3. One
+correction to the pre-code planning notes (customer count 19,820 → 19,119) is
+documented there too.
 
-**Deferred to the robustness pass (see §4, §6, §8):** Mediator, log4net, HTTP
-resilience (retry/circuit-breaker/timeout/rate-limiter), and the test suite in §9.
+**Done — robustness pass:** Mediator (with a logging pipeline behavior), log4net
+(sole logging sink, PII-safe by policy, console + rolling file), HTTP resilience
+(rate limiter, retry, circuit breaker, timeout — all configurable and validated at
+startup), and a 17-test suite (unit, contract, and gated SQL integration). Verified
+together, live, against the real simulator and database one more time after all of
+this landed — same correct end-to-end behavior, now with the Mediator pipeline
+behavior's duration/record-count line and log4net's file sink both confirmed
+working in that same run.
+
+**Not done — candidates for more time, not required for a working submission:**
+- .NET Framework 4.8 multi-targeting (argued in writing in §10, not built — this
+  was a deliberate planning decision, not a shortfall).
+- Real pagination beyond the `TOP(@n)` cap (§10).
+- Ack/lease-based requeue semantics (§10).
+- The automated PII-policy guard test mentioned in §9.
+- `CHALLENGE_SUBMISSION.md` is still the empty template — needs to be filled in
+  before this is ready to hand in, regardless of any further code changes.

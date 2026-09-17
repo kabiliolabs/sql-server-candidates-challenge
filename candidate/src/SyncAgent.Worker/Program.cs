@@ -7,6 +7,11 @@ using SyncAgent.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// log4net is the sole logging sink (default console/EventLog providers cleared) so every log
+// line goes through the PII-safe config in log4net.config, on both console and rolling file.
+builder.Logging.ClearProviders();
+builder.Logging.AddLog4Net("log4net.config");
+
 builder.Services.AddSyncAgentCore(builder.Configuration);
 builder.Services.AddSyncAgentInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<Worker>();
@@ -49,6 +54,7 @@ static bool TryValidateConfigurationOnStartup(IServiceProvider services, out int
     Validate<SyncAgentOptions>(nameof(SyncAgentOptions));
     Validate<SqlOptions>(nameof(SqlOptions));
     Validate<PlatformOptions>(nameof(PlatformOptions));
+    Validate<ResilienceOptions>(nameof(ResilienceOptions));
 
     if (hasFailures)
     {

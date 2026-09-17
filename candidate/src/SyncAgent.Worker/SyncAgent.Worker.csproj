@@ -8,11 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="log4net" Version="3.4.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SyncAgent.Core\SyncAgent.Core.csproj" />
     <ProjectReference Include="..\SyncAgent.Infrastructure\SyncAgent.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="log4net.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

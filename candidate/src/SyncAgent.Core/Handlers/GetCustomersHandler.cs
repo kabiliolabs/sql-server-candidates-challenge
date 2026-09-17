@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Options;
+using Mediator;
 using SyncAgent.Core.Abstractions;
-using SyncAgent.Core.Configuration;
+using SyncAgent.Core.Queries;
 using SyncAgent.Core.Tasks;
 
 namespace SyncAgent.Core.Handlers;
@@ -10,13 +10,11 @@ namespace SyncAgent.Core.Handlers;
 // "abstract at the second occurrence, not the first" call made during planning for the
 // dispatcher/handler layer, stays trivially readable, and a 5th task type is free to diverge
 // (e.g. need extra validation) without fighting a shared base.
-public sealed class GetCustomersHandler(ISyncQueryRepository<CustomerRecord> repository, IOptions<SyncAgentOptions> options) : ISyncTaskHandler
+public sealed class GetCustomersHandler(ISyncQueryRepository<CustomerRecord> repository) : IRequestHandler<GetCustomersQuery, IReadOnlyList<object>>
 {
-    public string TaskType => TaskTypes.GetCustomers;
-
-    public async Task<IReadOnlyList<object>> ExecuteAsync(SyncTaskRequest request, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlyList<object>> Handle(GetCustomersQuery request, CancellationToken cancellationToken)
     {
-        var records = await repository.GetModifiedSinceAsync(request.ModifiedSince, options.Value.MaxRowsPerTask, cancellationToken);
+        var records = await repository.GetModifiedSinceAsync(request.ModifiedSince, request.MaxRows, cancellationToken);
         return records.Cast<object>().ToList();
     }
 }

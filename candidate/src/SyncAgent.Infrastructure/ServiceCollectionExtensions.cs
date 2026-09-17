@@ -1,7 +1,11 @@
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.RateLimiting;
 using SyncAgent.Core.Abstractions;
 using SyncAgent.Core.Tasks;
 using SyncAgent.Infrastructure.Data;
@@ -42,13 +46,52 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<PlatformOptions>, PlatformOptionsValidator>());
 
+        services.AddOptions<ResilienceOptions>()
+            .Bind(configuration.GetSection("SyncAgent:Platform:Resilience"))
+            .ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<ResilienceOptions>, ResilienceOptionsValidator>());
+
         services.AddTransient<ApiKeyDelegatingHandler>();
         services.AddHttpClient<ISyncPlatformClient, SyncPlatformClient>((sp, client) =>
             {
                 var platformOptions = sp.GetRequiredService<IOptions<PlatformOptions>>().Value;
                 client.BaseAddress = new Uri(platformOptions.BaseUrl);
             })
-            .AddHttpMessageHandler<ApiKeyDelegatingHandler>();
+            .AddHttpMessageHandler<ApiKeyDelegatingHandler>()
+            .AddResilienceHandler("sync-platform", (builder, context) =>
+            {
+                var resilience = context.ServiceProvider.GetRequiredService<IOptions<ResilienceOptions>>().Value;
+
+                // Order mirrors Microsoft's own standard resilience handler: rate limiter
+                // outermost (self-throttle before spending any time), then timeout/retry/circuit
+                // breaker guarding each attempt.
+                builder.AddRateLimiter(new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = resilience.MaxRequestsPerSecond,
+                    Window = TimeSpan.FromSeconds(1),
+                    SegmentsPerWindow = 4,
+                    QueueLimit = resilience.RateLimiterQueueLimit,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+                builder.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = resilience.RetryMaxAttempts,
+                    BackoffType = DelayBackoffType.Exponential,
+                    Delay = TimeSpan.FromSeconds(resilience.RetryBaseDelaySeconds),
+                    UseJitter = true
+                });
+
+                builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+                {
+                    FailureRatio = resilience.CircuitBreakerFailureRatio,
+                    SamplingDuration = TimeSpan.FromSeconds(resilience.CircuitBreakerSamplingDurationSeconds),
+                    MinimumThroughput = resilience.CircuitBreakerMinimumThroughput,
+                    BreakDuration = TimeSpan.FromSeconds(resilience.CircuitBreakerBreakDurationSeconds)
+                });
+
+                builder.AddTimeout(TimeSpan.FromSeconds(resilience.TimeoutSeconds));
+            });
 
         return services;
     }

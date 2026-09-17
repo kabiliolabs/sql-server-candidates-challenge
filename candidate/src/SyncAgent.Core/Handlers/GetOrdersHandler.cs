@@ -1,17 +1,15 @@
-using Microsoft.Extensions.Options;
+using Mediator;
 using SyncAgent.Core.Abstractions;
-using SyncAgent.Core.Configuration;
+using SyncAgent.Core.Queries;
 using SyncAgent.Core.Tasks;
 
 namespace SyncAgent.Core.Handlers;
 
-public sealed class GetOrdersHandler(ISyncQueryRepository<OrderRecord> repository, IOptions<SyncAgentOptions> options) : ISyncTaskHandler
+public sealed class GetOrdersHandler(ISyncQueryRepository<OrderRecord> repository) : IRequestHandler<GetOrdersQuery, IReadOnlyList<object>>
 {
-    public string TaskType => TaskTypes.GetOrders;
-
-    public async Task<IReadOnlyList<object>> ExecuteAsync(SyncTaskRequest request, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlyList<object>> Handle(GetOrdersQuery request, CancellationToken cancellationToken)
     {
-        var records = await repository.GetModifiedSinceAsync(request.ModifiedSince, options.Value.MaxRowsPerTask, cancellationToken);
+        var records = await repository.GetModifiedSinceAsync(request.ModifiedSince, request.MaxRows, cancellationToken);
         return records.Cast<object>().ToList();
     }
 }
