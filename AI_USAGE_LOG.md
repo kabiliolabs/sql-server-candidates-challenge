@@ -380,4 +380,56 @@ submission doc.
 
 ---
 
+## 2026-09-17 — Fork, rebase, and PR
+
+**Asked:** Fork the upstream repo, reconcile the local history (created via `git
+init`, so it shared no ancestry with upstream) so the PR diff shows only real
+changes rather than the whole scaffold as newly added, then open the PR — with an
+explicit instruction to confirm before any rebase/push since rebasing rewrites
+local commit history.
+
+**AI did:**
+- Forked `kabiliolabs/sql-server-candidates-challenge` to `fetche/sql-server-candidates-challenge`
+  via `gh repo fork` (no remote auto-added, as requested).
+- Before touching history, ran a full audit of everything tracked in the local
+  repo — confirmed `docs/planning/` and `CHEATSHEET-local.md` were never tracked
+  in git history (not just currently gitignored), scanned all tracked files for
+  secrets/credentials (none found — the connection string uses Windows
+  Integrated Security, the API key is the documented test key from the challenge
+  itself), and confirmed no `bin/`/`obj/`/`logs/` were ever committed.
+- Added `fork` and `upstream` remotes, fetched `upstream/main`, and confirmed via
+  `git diff upstream/main 9d6a9d9` that the local scaffold matched upstream
+  almost exactly (only `.gitignore` and the initial `AI_USAGE_LOG.md` differed)
+  — so the rebase was expected to be mechanical.
+- **Stopped and asked for explicit confirmation before rebasing**, per the
+  instruction, since it rewrites all 11 local commits' SHAs even though the
+  branch had never been pushed anywhere.
+- Ran `git rebase upstream/main` — hit one conflict (`.gitignore`, an add/add
+  conflict on the "private prep notes" section added in the first commit),
+  resolved it by keeping the addition, and the remaining 10 commits replayed
+  cleanly with no further conflicts.
+- Verified `git diff upstream/main` showed only the real changes (64 files: all
+  of `candidate/`, `AI_USAGE_LOG.md`, `CHALLENGE_SUBMISSION.md`,
+  `docs/IMPLEMENTATION_PLAN.md`, and a 4-line `.gitignore` addition) — none of
+  the original scaffold files appeared, confirming they're byte-identical to
+  upstream.
+- Pushed the rebased branch to the fork, then drafted a PR title/body and showed
+  it before creating anything.
+- To calibrate the PR body's depth, read several other candidates' open PRs on
+  the upstream repo (public submissions to the same challenge) for structure and
+  length as a reference point, then wrote an expanded body in that style using
+  our own real findings — the two live-testing-only bugs, the customer-count
+  correction, verified end-to-end results — rather than copying their content.
+  Showed the expanded draft before creating the PR too.
+
+**I did:** Gave the explicit fork/rebase/PR plan with the confirm-before-rebase
+instruction, confirmed the rebase when asked, asked to see the PR body draft
+before creation (twice — once for the initial short version, once for the
+expanded version), and gave final approval to open it.
+
+**Result:** PR opened at
+https://github.com/kabiliolabs/sql-server-candidates-challenge/pull/17.
+
+---
+
 <!-- Add new entries above this line as work continues. -->
