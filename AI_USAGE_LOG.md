@@ -88,4 +88,29 @@ and verified the git repository, its commit, and its branch survived the move in
 
 ---
 
+## 2026-09-17 — Final layout: flatten repo, nest planning under docs
+
+**Asked:** Move the contents of `sql-server-candidates-challenge/` up into the
+`Kabilio` root and delete the now-empty folder, then move `planning/` inside `docs/`.
+
+**AI did:**
+- Flattened the repo: moved every file/folder (including `.git`) from
+  `sql-server-candidates-challenge/` up to `C:\Repos\Kabilio\`, so the git repo root
+  is now `Kabilio` itself.
+- Hit a locked-folder error removing the empty shell — a Bash shell still had its
+  cwd inside it, and lingering `dotnet`/MSBuild/Razor build-server processes held
+  file handles open. Changed the Bash cwd, ran `dotnet build-server shutdown`, and
+  the removal then succeeded.
+- Moved `planning/` (private research notes, cheatsheet, and the 48MB
+  `AdventureWorks2025.bak`) into `docs/planning/`.
+- Since `docs/planning/` now sits inside the git repo tree, added `docs/planning/`
+  to `.gitignore` before anything could be staged — `RESEARCH-NOTES-PRIVATE.md` and
+  `CHEATSHEET.md` (debrief strategy notes) must not ship in the submission, and the
+  `.bak` is far too large for a repo anyway.
+- Rebuilt `SyncPlatform` from the new path to confirm nothing broke.
+
+**I did:** Asked for the reorganization.
+
+---
+
 <!-- Add new entries above this line as work continues. -->
