@@ -343,4 +343,41 @@ more time in the simulator's GUI to trigger the final live verification.
 
 ---
 
+## 2026-09-17 — Ultra code review and fixes
+
+**Asked:** "Let's make an ultrareview of the code and then we write it" (referring
+to `CHALLENGE_SUBMISSION.md`).
+
+**AI did:** Ran `/code-review ultra` (a multi-agent cloud review) against the
+robustness-pass commit. It surfaced 3 confirmed findings:
+1. `SlidingWindowRateLimiter` constructed inline in the `AddResilienceHandler`
+   callback was never disposed — `AddRateLimiter(RateLimiter)` treats an
+   externally-supplied limiter as caller-owned, and `HttpClientFactory` rebuilds
+   the handler (re-running that callback) roughly every 2 minutes by default for
+   a long-running process, so this was a real, accumulating resource leak over
+   the Worker's lifetime.
+2. The three `WorkerTests` loop tests asserted a minimum poll-cycle count within a
+   fixed real-world `Task.Delay` window — flaky by construction on a loaded/slow
+   CI runner.
+3. `docs/IMPLEMENTATION_PLAN.md`'s status banner and §2 solution-structure diagram
+   still described the pre-Mediator design (referencing the deleted
+   `ISyncTaskHandler`, saying "robustness work comes next") even though §4/§6/§8/
+   §9/§11 of the same document had already been updated for the completed
+   Mediator migration in the prior commit.
+
+Fixed all three: added `context.OnPipelineDisposed(rateLimiter.Dispose)`; gave
+`Worker` an optional `TimeProvider` parameter (defaults to the real clock — DI
+never supplies one in production) and rewrote the three loop tests to use
+`FakeTimeProvider`, advancing virtual time explicitly instead of waiting on real
+delays (also dropped the Worker test suite's runtime from ~5s to ~75ms); updated
+the stale doc sections. Rebuilt, reran all 17 tests (still green), and ran one
+more live smoke test against the real simulator to confirm the `TimeProvider`
+constructor change and the rate-limiter disposal wiring didn't break production
+startup or normal polling.
+
+**I did:** Asked for the review and to proceed with fixes before writing the
+submission doc.
+
+---
+
 <!-- Add new entries above this line as work continues. -->
