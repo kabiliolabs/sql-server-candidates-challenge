@@ -175,4 +175,109 @@ xUnit.
 
 ---
 
+## 2026-09-17 — Started coding: found and corrected a bug in the prior research
+
+**Asked:** Start implementing, focus on getting an end-to-end working version first,
+add robustness afterward.
+
+**AI did:**
+- Scaffolded the `candidate/` solution: `SyncAgent.Core` (no I/O), `SyncAgent.Infrastructure`
+  (Dapper/SQL), `SyncAgent.Worker` (BackgroundService), and matching test projects,
+  wired into one `.sln` with correct project references.
+- Added `Dapper` and `Microsoft.Data.SqlClient` to Infrastructure.
+- Wrote Core DTOs (`SyncTask`, `SyncResult`, per-task-type records), the
+  `ISyncTaskHandler`/`ISyncPlatformClient` abstractions, and a `SyncTaskDispatcher`
+  that allow-lists task types and always produces a result (never throws past
+  itself) so the worker loop can always post something back.
+- Before writing the customer query, verified column names and join cardinality
+  directly against the restored database rather than trusting the prep notes as-is.
+  This caught a real bug in `RESEARCH-NOTES-PRIVATE.md`: the notes verified the
+  customer join against only the 2 example customers (11000, 11001) and concluded
+  19,820 was the correct row count, explicitly dismissing another candidate's
+  reported 19,119 as wrong. Checking against the full table showed 701 of the
+  19,820 filtered `Sales.Customer` rows have `PersonID IS NULL` (store/B2B accounts,
+  no linked `Person` row) — an inner join to get name/email/address correctly drops
+  them, landing at 19,119. The other candidate's number was right; the private
+  notes' dismissal of it was not.
+- Flagged this to the user with the evidence and asked how to handle store
+  accounts, since the sample payload's shape has no field for them.
+
+**I did:** Chose to exclude store/B2B accounts (inner join, 19,119 rows),
+documented as out of scope since the sample payload has no shape for a business
+account.
+
+---
+
+## 2026-09-17 — MVP implementation: architecture refinement, coding, live debugging
+
+**Asked (across several messages):** Apply a set of specific architecture
+refinements while coding (query-strategy pairing, Options pattern with
+`IValidateOptions<T>`, Result-type-not-exceptions for expected failures,
+decorator/pipeline behaviors for cross-cutting concerns, segregated repository
+interfaces, explicit phone-null mapping) — then start coding, focused on making it
+work first. Later: exclude `bin`/`obj`/`.vs` from the repo; add config validation
+at startup with logging.
+
+**AI did:**
+- Scaffolded the `candidate/` solution: `SyncAgent.Core` (no I/O), `SyncAgent.Infrastructure`
+  (Dapper/HTTP), `SyncAgent.Worker` (BackgroundService), matching test projects.
+  `dotnet new sln` defaulted to the new `.slnx` format under the installed .NET 10
+  SDK; recreated it as a classic `.sln` since the README targets .NET 8 SDK and a
+  reviewer might not have `.slnx` support.
+- Implemented all four task types: DTOs, `ISyncTaskHandler`/`ISyncQueryRepository<TRecord>`
+  abstractions, `SyncTaskDispatcher` (allow-list + never-throws), four thin Core
+  handlers, four Infrastructure repositories (Dapper + parameterized SQL), the
+  typed `SyncPlatformClient`, and the DI composition root in `Program.cs` — applying
+  every architecture point from the mid-turn request (see `docs/IMPLEMENTATION_PLAN.md`
+  §4 and §7 for the applied design; not restated here).
+- Verified `.gitignore` already excluded `bin/`/`obj/`/`.vs/` correctly — no change
+  needed, confirmed via `git status`.
+- Added fail-fast config validation with logging: `IValidateOptions<T>` per options
+  type (`SyncAgentOptions`, `SqlOptions`, `PlatformOptions`) plus an explicit
+  resolve-and-catch step in `Program.cs` that logs every validation failure via
+  `ILogger` at Critical before exiting non-zero, rather than letting a missing env
+  var surface as a stack trace on the first task.
+- Before writing the customer query, checked join cardinality against the full
+  restored database rather than trusting the pre-code research notes' 2-row
+  spot-check. Found and corrected a real error in those notes: they verified only
+  the 2 sample customers and concluded 19,820 was right, dismissing another
+  candidate's 19,119 as wrong. The actual cause of the gap is 701 store/B2B
+  customers with `PersonID IS NULL` — an inner join to get person data correctly
+  excludes them, landing at 19,119. Flagged this to the user with evidence and
+  asked how to handle store accounts (see the "Store customers" question, answered:
+  exclude them).
+- Also found ~24 customers with more than one address row (fan-out risk the 2-row
+  sample check couldn't have revealed) and deduped deterministically with
+  `ROW_NUMBER()`.
+- Ran a live, manual end-to-end test: started the real `SyncPlatform` WPF simulator
+  and the real `AdventureWorks2025` database, ran the Worker, and asked the user to
+  click each of the four task buttons in the simulator's UI (something the AI
+  cannot do itself — no GUI automation available) while watching the Worker's
+  output. This caught two real bugs invisible to a code read-through:
+  1. `GetProducts` failed — Dapper's constructor-based materialization can't
+     convert a SQL `datetime` column to a `DateTimeOffset` constructor parameter;
+     it fails with a message that reads as if a parameterless constructor is
+     missing. Fixed by introducing an internal `*Row` type with `DateTime` for
+     every repository with a date column, converted explicitly to `DateTimeOffset`
+     in the mapping step — same pattern already used for the `phone` field.
+  2. `GetOrders` failed — SQL Server's 2,100-parameter-per-query limit, hit by
+     Dapper expanding `WHERE SalesOrderID IN @Ids` into one parameter per id when
+     the header query (capped at 5,000) returned enough orders. Fixed by batching
+     the detail query into chunks of 2,000 ids.
+  After both fixes, re-ran the same manual test and confirmed all four task types
+  complete successfully with correct record counts and payload shapes matching
+  `docs/sample-payloads/`.
+- Updated `docs/IMPLEMENTATION_PLAN.md` throughout to reflect the applied
+  architecture, the corrected customer count, and both bugs — it's now a living
+  document rather than a frozen pre-code plan.
+- Removed the template placeholder `UnitTest1.cs` files from the three test
+  projects (no real tests written yet — next milestone).
+
+**I did:** Specified the architecture refinements to apply, decided to focus on a
+working MVP before robustness features, and manually clicked each task-type button
+in the simulator's GUI so the AI could observe the live request/response payloads
+— the one step in this session the AI structurally couldn't do itself.
+
+---
+
 <!-- Add new entries above this line as work continues. -->
